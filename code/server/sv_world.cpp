@@ -46,7 +46,7 @@ clipHandle_t SV_ClipHandleForEntity( const gentity_t *ent ) {
 	}
 
 	// create a temp tree from bounding box sizes
-	return CM_TempBoxModel( ent->mins, ent->maxs );
+	return CM_TempBoxModel( ent->mins, ent->maxs );//, ent->contents );
 }
 
 
