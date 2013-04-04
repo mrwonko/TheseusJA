@@ -186,15 +186,6 @@ SOURCE=.\0_compiled_first\0_SH_Leak.cpp
 # PROP Default_Filter ""
 # Begin Source File
 
-SOURCE=".\client\eax\eax-util.cpp"
-# SUBTRACT CPP /YX
-# End Source File
-# Begin Source File
-
-SOURCE=".\client\eax\eax-util.h"
-# End Source File
-# Begin Source File
-
 SOURCE=.\client\eax\eax.h
 # End Source File
 # Begin Source File
@@ -333,6 +324,11 @@ SOURCE=.\qcommon\files.cpp
 # Begin Source File
 
 SOURCE=.\game\genericparser2.cpp
+# SUBTRACT CPP /YX
+# End Source File
+# Begin Source File
+
+SOURCE=.\qcommon\hstring.cpp
 # SUBTRACT CPP /YX
 # End Source File
 # Begin Source File
@@ -574,6 +570,10 @@ SOURCE=.\game\g_shared.h
 # Begin Source File
 
 SOURCE=.\game\genericparser2.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\qcommon\hstring.h
 # End Source File
 # Begin Source File
 
