@@ -985,10 +985,6 @@ SOURCE=.\g_icarus.h
 # End Source File
 # Begin Source File
 
-SOURCE=.\g_infostrings.h
-# End Source File
-# Begin Source File
-
 SOURCE=.\g_items.h
 # End Source File
 # Begin Source File
