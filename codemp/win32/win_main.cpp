@@ -1001,17 +1001,12 @@ static bool Sys_IsExpired()
 	return false;
 }
 
-/*
-================
-Sys_Init
-
-Called after the common systems (cvars, files, etc)
-are initialized
-================
-*/
 #define OSR2_BUILD_NUMBER 1111
 #define WIN98_BUILD_NUMBER 1998
 
+/**
+	Called after the common systems (cvars, files, etc) are initialized
+*/
 void Sys_Init( void ) {
 	// make sure the timer is high precision, otherwise
 	// NT gets 18ms resolution
@@ -1066,8 +1061,10 @@ void Sys_Init( void ) {
 	IN_Init();		// FIXME: not in dedicated?
 }
 
-// do a quick mem test to check for any potential future mem problems...
-//
+/** @brief Does a quick mem test to check for any potential future mem problems
+	
+	Tests if 128MB can be allocated still.
+*/
 void QuickMemTest(void)
 {
 //	if (!Sys_LowPhysicalMemory())
@@ -1104,16 +1101,8 @@ void QuickMemTest(void)
 	}
 }
 
-
-//=======================================================================
-//int	totalMsec, countMsec;
-
-/*
-==================
-WinMain
-
-==================
-*/
+/** @brief Entry Point on Windows
+**/
 int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 //	int			startTime, endTime;
 

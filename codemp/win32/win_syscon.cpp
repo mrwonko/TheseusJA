@@ -254,8 +254,9 @@ LONG WINAPI InputLineWndProc( HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 	return CallWindowProc( s_wcd.SysInputLineWndProc, hWnd, uMsg, wParam, lParam );
 }
 
-/*
-** Sys_CreateConsole
+/** @brief Create a Console Window
+	
+	Until the Renderer has been initialized (and can thus be used for console output) this is where messages/errors/... go.
 */
 void Sys_CreateConsole( void )
 {
