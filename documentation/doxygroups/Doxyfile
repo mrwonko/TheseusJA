@@ -1,0 +1,11 @@
+DOXYFILE_ENCODING      = UTF-8
+PROJECT_NAME           = "Group Test"
+GENERATE_LATEX         = NO
+INPUT                  = .
+HAVE_DOT               = YES
+# If the GROUP_GRAPHS and HAVE_DOT tags are set to YES then doxygen 
+# will generate a graph for groups, showing the direct groups dependencies
+GROUP_GRAPHS           = YES
+
+# let's try a custom layout
+LAYOUT_FILE            = DoxygenLayout.xml
