@@ -16,9 +16,6 @@ This file is part of Jedi Academy.
 */
 // Copyright 2001-2013 Raven Software
 
-// leave this line at the top for all g_xxxx.cpp files...
-#include "g_headers.h"
-
 //seems to be a compiler bug, it doesn't clean out the #ifdefs between dif-compiles
 //or something, so the headers spew errors on these defs from the previous compile.
 //this fixes that. -rww
@@ -61,7 +58,7 @@ This file is part of Jedi Academy.
 #ifndef _JK2MP
 #include "g_functions.h"
 #include "g_vehicles.h"
-#include "..\game\wp_saber.h"
+#include "../game/wp_saber.h"
 #else
 #include "bg_vehicles.h"
 #endif
@@ -86,6 +83,8 @@ This file is part of Jedi Academy.
 #else
 #define bgEntity_t gentity_t
 #endif
+
+#include "../cgame/cg_local.h"
 
 #ifdef QAGAME //we only want a few of these functions for BG
 
@@ -203,9 +202,9 @@ static void ProcessMoveCommands( Vehicle_t *pVeh )
 
 #ifndef _JK2MP//SP
 	curTime = level.time;
-#elif QAGAME//MP GAME
+#elif defined QAGAME//MP GAME
 	curTime = level.time;
-#elif CGAME//MP CGAME
+#elif defined CGAME//MP CGAME
 	//FIXME: pass in ucmd?  Not sure if this is reliable...
 	curTime = pm->cmd.serverTime;
 #endif

@@ -1,6 +1,3 @@
-//Anything above this #include will be ignored by the compiler
-#include "qcommon/exe_headers.h"
-
 #include "tr_local.h"
 
 /*
@@ -24,7 +21,7 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 LerpDrawVert
 ============
 */
-static void LerpDrawVert( drawVert_t *a, drawVert_t *b, drawVert_t *out ) 
+static void LerpDrawVert( drawVert_t *a, drawVert_t *b, drawVert_t *out )
 {
 	int	k;
 
@@ -248,7 +245,7 @@ static void InvertErrorTable( float errorTable[2][MAX_GRID_SIZE], int width, int
 PutPointsOnCurve
 ==================
 */
-static void PutPointsOnCurve( drawVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE], 
+static void PutPointsOnCurve( drawVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE],
 							 int width, int height ) {
 	int			i, j;
 	drawVert_t	prev, next;
@@ -353,7 +350,7 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 	float		len, maxLen;
 	int			dir;
 	int			t;
-	MAC_STATIC drawVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
+	drawVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
 	float		errorTable[2][MAX_GRID_SIZE];
 
 	for ( i = 0 ; i < width ; i++ ) {
@@ -511,7 +508,7 @@ R_GridInsertColumn
 srfGridMesh_t *R_GridInsertColumn( srfGridMesh_t *grid, int column, int row, vec3_t point, float loderror ) {
 	int i, j;
 	int width, height, oldwidth;
-	MAC_STATIC drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
+	drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
 	float errorTable[2][MAX_GRID_SIZE];
 	float lodRadius;
 	vec3_t lodOrigin;
@@ -565,7 +562,7 @@ R_GridInsertRow
 srfGridMesh_t *R_GridInsertRow( srfGridMesh_t *grid, int row, int column, vec3_t point, float loderror ) {
 	int i, j;
 	int width, height, oldheight;
-	MAC_STATIC drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
+	drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
 	float errorTable[2][MAX_GRID_SIZE];
 	float lodRadius;
 	vec3_t lodOrigin;

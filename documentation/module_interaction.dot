@@ -1,0 +1,6 @@
+// what modules call what other ones?
+
+digraph module_interaction
+{
+	main -> Sys [label="Sys_CreateConsole"];
+}

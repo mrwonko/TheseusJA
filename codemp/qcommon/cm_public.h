@@ -1,3 +1,5 @@
+#pragma once
+
 #include "qcommon/q_shared.h"
 #include "qfiles.h"
 
@@ -9,7 +11,6 @@ clipHandle_t CM_TempBoxModel( const vec3_t mins, const vec3_t maxs, int capsule 
 
 void		CM_ModelBounds( clipHandle_t model, vec3_t mins, vec3_t maxs );
 
-int			CM_NumClusters (void);
 int			CM_NumInlineModels( void );
 char		*CM_EntityString (void);
 
@@ -44,7 +45,7 @@ void		CM_HandlePatchCollision(struct traceWork_s *tw, trace_t &trace, const vec3
 void		CM_CalcExtents(const vec3_t start, const vec3_t end, const struct traceWork_s *tw, vec3pair_t bounds);
 
 // cm_tag.c
-int			CM_LerpTag( orientation_t *tag,  clipHandle_t model, int startFrame, int endFrame, 
+int			CM_LerpTag( orientation_t *tag,  clipHandle_t model, int startFrame, int endFrame,
 					 float frac, const char *tagName );
 
 

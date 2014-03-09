@@ -18,7 +18,7 @@ This file is part of Jedi Academy.
 
 #include "../server/exe_headers.h"
 
-#include "../game/q_shared.h"
+#include "q_shared.h"
 
 #include "cm_local.h"
 #include "memory.h"
@@ -223,7 +223,7 @@ surfaceparm <name>
 
 typedef struct 
 {
-	char	*name;
+	const char	*name;
 	int		clearSolid, surfaceFlags, contents;
 } infoParm_t;
 
@@ -410,7 +410,7 @@ void CM_ParseShader( CCMShader *shader, const char **text )
 		}
 		// sun parms
 		// q3map_sun deprecated as of 11 Jan 01
-		else if ( !Q_stricmp( token, "sun" ) || !Q_stricmp( token, "q3map_sun" ) ) 
+		else if ( !Q_stricmp( token, "sun" ) || !Q_stricmp( token, "q3map_sun" ) || !Q_stricmp( token, "q3map_sunExt" ) )
 		{
 //			float	a, b;
 
@@ -436,6 +436,9 @@ void CM_ParseShader( CCMShader *shader, const char **text )
 //			shader->sunDirection[0] = cos( a ) * cos( b );
 //			shader->sunDirection[1] = sin( a ) * cos( b );
 //			shader->sunDirection[2] = sin( b );
+
+			SkipRestOfLine( text );
+			continue;
 		}
 		else if ( !Q_stricmp( token, "surfaceParm" ) ) 
 		{

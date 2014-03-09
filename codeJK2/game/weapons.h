@@ -24,6 +24,8 @@ This file is part of Jedi Knight 2.
 #ifndef __WEAPONS_H__
 #define __WEAPONS_H__
 
+#include "../../code/qcommon/q_shared.h"
+
 typedef enum //# weapon_e
 {
 	WP_NONE,
@@ -135,7 +137,6 @@ typedef struct weaponData_s
 
 	char	missileHitSound[64];	// Missile impact sound
 	char	altmissileHitSound[64];	// alt Missile impact sound
-#ifndef _USRDLL
 	void	*func;
 	void	*altfunc;
 
@@ -143,8 +144,6 @@ typedef struct weaponData_s
 	int		mMuzzleEffectID;
 	char	mAltMuzzleEffect[64];
 	int		mAltMuzzleEffectID;
-
-#endif
 
 	// OPENJK ADD
 	int		damage;
@@ -159,11 +158,10 @@ typedef struct weaponData_s
 
 typedef struct ammoData_s
 {
-	char	icon[32];	// Name of ammo icon file
+	char	icon[64];	// Name of ammo icon file
 	int		max;		// Max amount player can hold of ammo
 } ammoData_t;
 
-// Moved from g_weapons.cpp. Seems like a much nicer place to have these here --eez
 // Bryar Pistol
 //--------
 #define BRYAR_PISTOL_VEL			1800

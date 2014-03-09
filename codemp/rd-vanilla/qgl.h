@@ -1,9 +1,8 @@
+#pragma once
+
 /*
 ** QGL.H
 */
-
-#ifndef __QGL_H__
-#define __QGL_H__
 
 #if defined( __LINT__ )
 
@@ -282,7 +281,7 @@ extern PFNWGLSETPBUFFERATTRIBARBPROC		qwglSetPbufferAttribARB;
 #define GL_VERTEX_PROGRAM_ARB                       0x8620
 #define GL_PROGRAM_FORMAT_ASCII_ARB                 0x8875
 
-typedef void (APIENTRY * PFNGLPROGRAMSTRINGARBPROC) (GLenum target, GLenum format, GLsizei len, const GLvoid *string); 
+typedef void (APIENTRY * PFNGLPROGRAMSTRINGARBPROC) (GLenum target, GLenum format, GLsizei len, const GLvoid *string);
 typedef void (APIENTRY * PFNGLBINDPROGRAMARBPROC) (GLenum target, GLuint program);
 typedef void (APIENTRY * PFNGLDELETEPROGRAMSARBPROC) (GLsizei n, const GLuint *programs);
 typedef void (APIENTRY * PFNGLGENPROGRAMSARBPROC) (GLsizei n, GLuint *programs);
@@ -354,14 +353,9 @@ extern	void ( APIENTRY * qglTexSubImage3DEXT) (GLenum, GLint, GLint, GLint, GLin
 //===========================================================================
 
 // non-windows systems will just redefine qgl* to gl*
-#if !defined( _WIN32 ) && !defined(MACOS_X) && !defined( __linux__ ) && !defined( __FreeBSD__ ) // rb010123
-
-#include "qgl_linked.h"
-
-#elif defined(MACOS_X)
-// This includes #ifdefs for optional logging and GL error checking after every GL call as well as #defines to prevent incorrect usage of the non-'qgl' versions of the GL API.
-#include "../macosx/macosx_qgl.h"
-
+#if defined(MACOS_X)
+	// This includes #ifdefs for optional logging and GL error checking after every GL call as well as #defines to prevent incorrect usage of the non-'qgl' versions of the GL API.
+	#include "../macosx/macosx_qgl.h"
 #else
 
 // windows systems use a function pointer for each call so we can load minidrivers
@@ -756,5 +750,3 @@ extern void (*qglXSwapBuffers)( Display *dpy, GLXDrawable drawable );
 #endif // __linux__ || __FreeBSD__ // rb010123
 
 #endif	// _WIN32 && __linux__
-
-#endif

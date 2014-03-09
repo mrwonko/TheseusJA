@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.8)
 
 # Make sure the user is not executing this script directly
 if(NOT InOpenJK)
@@ -8,10 +8,8 @@ endif(NOT InOpenJK)
 set(MPGameIncludeDirectories "${MPDir}")
 if(WIN32)
 	set(MPGameLibraries "winmm")
-else(WIN32)
-	message("codemp/game/CMakeLists.txt might need some libraries to link properly on your platform.")
 endif(WIN32)
-set(MPGameDefines ${MPSharedDefines} "QAGAME" "MISSIONPACK" )
+set(MPGameDefines ${MPSharedDefines} "_GAME" )
 set(MPGameGameFiles
 	"${MPDir}/game/ai_main.c"
 	"${MPDir}/game/ai_util.c"
@@ -33,6 +31,7 @@ set(MPGameGameFiles
 	"${MPDir}/game/g_client.c"
 	"${MPDir}/game/g_cmds.c"
 	"${MPDir}/game/g_combat.c"
+	"${MPDir}/game/g_cvar.c"
 	"${MPDir}/game/g_exphysics.c"
 	"${MPDir}/game/g_ICARUScb.c"
 	"${MPDir}/game/g_items.c"
@@ -48,7 +47,6 @@ set(MPGameGameFiles
 	"${MPDir}/game/g_saga.c"
 	"${MPDir}/game/g_session.c"
 	"${MPDir}/game/g_spawn.c"
-	"${MPDir}/game/g_strap.c"
 	"${MPDir}/game/g_svcmds.c"
 	"${MPDir}/game/g_syscalls.c"
 	"${MPDir}/game/g_target.c"
@@ -106,12 +104,9 @@ set(MPGameGameFiles
 	"${MPDir}/game/bg_local.h"
 	"${MPDir}/game/bg_public.h"
 	"${MPDir}/game/bg_saga.h"
-	"${MPDir}/game/bg_strap.h"
 	"${MPDir}/game/bg_vehicles.h"
 	"${MPDir}/game/bg_weapons.h"
-	"${MPDir}/botlib/botlib.h"
 	"${MPDir}/game/chars.h"
-	"${MPDir}/game/g_headers.h"
 	"${MPDir}/game/g_ICARUScb.h"
 	"${MPDir}/game/g_local.h"
 	"${MPDir}/game/g_nav.h"
@@ -123,7 +118,6 @@ set(MPGameGameFiles
 	"${MPDir}/game/npc_headers.h"
 	"${MPDir}/game/say.h"
 	"${MPDir}/game/surfaceflags.h"
-	"${MPDir}/game/syn.h"
 	"${MPDir}/game/teams.h"
 	"${MPDir}/game/w_saber.h"
 	)
@@ -135,6 +129,7 @@ set(MPGameCommonFiles
 	"${MPDir}/qcommon/q_shared.c"
 	"${MPDir}/qcommon/disablewarnings.h"
 	"${MPDir}/qcommon/q_shared.h"
+	"${MPDir}/qcommon/q_platform.h"
 	"${MPDir}/qcommon/tags.h"
 	)
 source_group("common" FILES ${MPGameCommonFiles})
@@ -142,16 +137,15 @@ set(MPGameFiles ${MPGameFiles} ${MPGameCommonFiles})
 
 set(MPGameCgameFiles
 	"${MPDir}/cgame/animtable.h"
-	"${MPDir}/cgame/cg_local.h"
 	"${MPDir}/cgame/cg_public.h"
 	)
 source_group("cgame" FILES ${MPGameCgameFiles})
 set(MPGameFiles ${MPGameFiles} ${MPGameCgameFiles})
 
 set(MPGameRendererFiles
-	"${MPDir}/renderer/tr_types.h"
+	"${MPDir}/rd-common/tr_types.h"
 	)
-source_group("renderer" FILES ${MPGameRendererFiles})
+source_group("rd-common" FILES ${MPGameRendererFiles})
 set(MPGameFiles ${MPGameFiles} ${MPGameRendererFiles})
 
 set(MPGameBotlibFiles
@@ -163,6 +157,7 @@ set(MPGameBotlibFiles
 	"${MPDir}/botlib/be_ai_move.h"
 	"${MPDir}/botlib/be_ai_weap.h"
 	"${MPDir}/botlib/be_ea.h"
+	"${MPDir}/botlib/botlib.h"
 	)
 source_group("botlib" FILES ${MPGameBotlibFiles})
 set(MPGameFiles ${MPGameFiles} ${MPGameBotlibFiles})
@@ -187,12 +182,23 @@ source_group("ui" FILES ${MPGameUiFiles})
 set(MPGameFiles ${MPGameFiles} ${MPGameUiFiles})
 
 add_library(${MPGame} SHARED ${MPGameFiles})
-install(TARGETS ${MPGame} RUNTIME DESTINATION "OpenJK")
+
+if(NOT WIN32)
+	# remove "lib" prefix for .so/.dylib files
+	set_target_properties(${MPGame} PROPERTIES PREFIX "")
+endif(NOT WIN32)
+
+if(WIN32)
+	install(TARGETS ${MPGame} RUNTIME DESTINATION "OpenJK")
+else(WIN32)
+	install(TARGETS ${MPGame} LIBRARY DESTINATION "OpenJK")
+endif(WIN32)
 set_target_properties(${MPGame} PROPERTIES COMPILE_DEFINITIONS_RELWITHDEBINFO "${MPGameDefines};${ReleaseDefines}")
 set_target_properties(${MPGame} PROPERTIES COMPILE_DEFINITIONS_MINSIZEREL "${MPGameDefines};${ReleaseDefines}")
 set_target_properties(${MPGame} PROPERTIES COMPILE_DEFINITIONS_RELEASE "${MPGameDefines};${ReleaseDefines}")
 set_target_properties(${MPGame} PROPERTIES COMPILE_DEFINITIONS_DEBUG "${MPGameDefines};${DebugDefines}")
 set_target_properties(${MPGame} PROPERTIES INCLUDE_DIRECTORIES "${MPGameIncludeDirectories}")
+set_target_properties(${MPGame} PROPERTIES PROJECT_LABEL "MP Game Library")
 # no libraries used
 if(MPGameLibraries)
 	target_link_libraries(${MPGame} ${MPGameLibraries})

@@ -1,6 +1,3 @@
-//Anything above this #include will be ignored by the compiler
-#include "qcommon/exe_headers.h"
-
 // tr_models.c -- model loading and caching
 
 #include "tr_local.h"
@@ -8,11 +5,15 @@
 
 #include "qcommon/disablewarnings.h"
 
+#ifdef _MSC_VER
 #pragma warning (push, 3)	//go back down to 3 for the stl include
+#endif
 #include "qcommon/sstring.h"	// #include <string>
 #include <vector>
 #include <map>
+#ifdef _MSC_VER
 #pragma warning (pop)
+#endif
 
 using namespace std;
 
@@ -40,7 +41,7 @@ Ghoul2 Insert End
 */
 
 
-// This stuff looks a bit messy, but it's kept here as black box, and nothing appears in any .H files for other 
+// This stuff looks a bit messy, but it's kept here as black box, and nothing appears in any .H files for other
 //	modules to worry about. I may make another module for this sometime.
 //
 typedef pair<int,int> StringOffsetAndShaderIndexDest_t;
@@ -49,7 +50,7 @@ struct CachedEndianedModelBinary_s
 {
 	void	*pModelDiskImage;
 	int		iAllocSize;		// may be useful for mem-query, but I don't actually need it
-	ShaderRegisterData_t ShaderRegisterData;	
+	ShaderRegisterData_t ShaderRegisterData;
 	int		iLastLevelUsedOn;
 	int		iPAKFileCheckSum;	// else -1 if not from PAK
 
@@ -70,7 +71,7 @@ CachedModels_t *CachedModels = NULL;	// the important cache item.
 void RE_RegisterModels_StoreShaderRequest(const char *psModelFileName, const char *psShaderName, int *piShaderIndexPoke)
 {
 	char sModelName[MAX_QPATH];
-	
+
 	assert(CachedModels);
 
 	Q_strncpyz(sModelName,psModelFileName,sizeof(sModelName));
@@ -79,7 +80,7 @@ void RE_RegisterModels_StoreShaderRequest(const char *psModelFileName, const cha
 	CachedEndianedModelBinary_t &ModelBin = (*CachedModels)[sModelName];
 
 	if (ModelBin.pModelDiskImage == NULL)
-	{	
+	{
 		assert(0);	// should never happen, means that we're being called on a model that wasn't loaded
 	}
 	else
@@ -92,7 +93,7 @@ void RE_RegisterModels_StoreShaderRequest(const char *psModelFileName, const cha
 }
 
 
-static const byte FakeGLAFile[] = 
+static const byte FakeGLAFile[] =
 {
 0x32, 0x4C, 0x47, 0x41, 0x06, 0x00, 0x00, 0x00, 0x2A, 0x64, 0x65, 0x66, 0x61, 0x75, 0x6C, 0x74,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -120,12 +121,12 @@ void RE_LoadWorldMap_Actual( const char *name, world_t &worldData, int index );
 // returns qtrue if loaded, and sets the supplied qbool to true if it was from cache (instead of disk)
 //   (which we need to know to avoid LittleLong()ing everything again (well, the Mac needs to know anyway)...
 //
-// don't use ri.xxx functions in case running on dedicated...
+// don't use ri->xxx functions in case running on dedicated...
 //
 qboolean RE_RegisterModels_GetDiskFile( const char *psModelFileName, void **ppvBuffer, qboolean *pqbAlreadyCached)
 {
 	char sModelName[MAX_QPATH];
-	
+
 	assert(CachedModels);
 
 	Q_strncpyz(sModelName,psModelFileName,sizeof(sModelName));
@@ -148,16 +149,16 @@ qboolean RE_RegisterModels_GetDiskFile( const char *psModelFileName, void **ppvB
 				memcpy(pvFakeGLAFile, &FakeGLAFile[0],  sizeof(FakeGLAFile));
 				*ppvBuffer = pvFakeGLAFile;
 				*pqbAlreadyCached = qfalse;	// faking it like this should mean that it works fine on the Mac as well
-				return qtrue;	
+				return qtrue;
 			}
 
-		ri.FS_ReadFile( sModelName, ppvBuffer );
+		ri->FS_ReadFile( sModelName, ppvBuffer );
 		*pqbAlreadyCached = qfalse;
 		qboolean bSuccess = !!(*ppvBuffer)?qtrue:qfalse;
 
 		if (bSuccess)
-		{				
-			ri.Printf( PRINT_DEVELOPER, "RE_RegisterModels_GetDiskFile(): Disk-loading \"%s\"\n",psModelFileName);
+		{
+			ri->Printf( PRINT_DEVELOPER, "RE_RegisterModels_GetDiskFile(): Disk-loading \"%s\"\n",psModelFileName);
 		}
 
 		return bSuccess;
@@ -173,7 +174,7 @@ qboolean RE_RegisterModels_GetDiskFile( const char *psModelFileName, void **ppvB
 
 // if return == true, no further action needed by the caller...
 //
-// don't use ri.xxx functions in case running on dedicated
+// don't use ri->xxx functions in case running on dedicated
 //
 void *RE_RegisterModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, const char *psModelFileName, qboolean *pqbAlreadyFound, memtag_t eTag)
 {
@@ -194,7 +195,7 @@ void *RE_RegisterModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, const 
 		//	then don't thrown it away on return - cuts down on mem overhead
 		//
 		// ... groan, but not if doing a limb hierarchy creation (some VV stuff?), in which case it's NULL
-		//				
+		//
 		if ( pvDiskBufferIfJustLoaded )
 		{
 			Z_MorphMallocTag( pvDiskBufferIfJustLoaded, eTag );
@@ -207,8 +208,8 @@ void *RE_RegisterModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, const 
 		ModelBin.pModelDiskImage	= pvDiskBufferIfJustLoaded;
 		ModelBin.iAllocSize			= iSize;
 
-		int iCheckSum;		
-		if (ri.FS_FileIsInPAK(sModelName, &iCheckSum) == 1)
+		int iCheckSum;
+		if (ri->FS_FileIsInPAK(sModelName, &iCheckSum) == 1)
 		{
 			ModelBin.iPAKFileCheckSum = iCheckSum;	// else ModelBin's constructor will leave it as -1
 		}
@@ -229,15 +230,15 @@ void *RE_RegisterModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, const 
 			int  *piShaderPokePtr	= (int *) &((char*)ModelBin.pModelDiskImage)[iShaderPokeOffset];
 
 			shader_t *sh = R_FindShader( psShaderName, lightmapsNone, stylesDefault, qtrue );
-	            
-			if ( sh->defaultShader ) 
+
+			if ( sh->defaultShader )
 			{
 				*piShaderPokePtr = 0;
 			} else {
 				*piShaderPokePtr = sh->index;
 			}
 		}
-		*pqbAlreadyFound = qtrue;	// tell caller not to re-Endian or re-Shader this binary		
+		*pqbAlreadyFound = qtrue;	// tell caller not to re-Endian or re-Shader this binary
 	}
 
 	ModelBin.iLastLevelUsedOn = RE_RegisterMedia_GetLevel();
@@ -264,7 +265,7 @@ void *RE_RegisterServerModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, 
 		//	then don't thrown it away on return - cuts down on mem overhead
 		//
 		// ... groan, but not if doing a limb hierarchy creation (some VV stuff?), in which case it's NULL
-		//				
+		//
 		if ( pvDiskBufferIfJustLoaded )
 		{
 			Z_MorphMallocTag( pvDiskBufferIfJustLoaded, eTag );
@@ -277,8 +278,8 @@ void *RE_RegisterServerModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, 
 		ModelBin.pModelDiskImage	= pvDiskBufferIfJustLoaded;
 		ModelBin.iAllocSize			= iSize;
 
-		int iCheckSum;		
-		if (ri.FS_FileIsInPAK(sModelName, &iCheckSum) == 1)
+		int iCheckSum;
+		if (ri->FS_FileIsInPAK(sModelName, &iCheckSum) == 1)
 		{
 			ModelBin.iPAKFileCheckSum = iCheckSum;	// else ModelBin's constructor will leave it as -1
 		}
@@ -300,8 +301,8 @@ void *RE_RegisterServerModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, 
 			int  *piShaderPokePtr	= (int *) &((char*)ModelBin.pModelDiskImage)[iShaderPokeOffset];
 
 			shader_t *sh = R_FindShader( psShaderName, lightmapsNone, stylesDefault, qtrue );
-	            
-			if ( sh->defaultShader ) 
+
+			if ( sh->defaultShader )
 			{
 				*piShaderPokePtr = 0;
 			} else {
@@ -310,7 +311,7 @@ void *RE_RegisterServerModels_Malloc(int iSize, void *pvDiskBufferIfJustLoaded, 
 		}
 		*/
 		//No. Bad.
-		*pqbAlreadyFound = qtrue;	// tell caller not to re-Endian or re-Shader this binary		
+		*pqbAlreadyFound = qtrue;	// tell caller not to re-Endian or re-Shader this binary
 	}
 
 	ModelBin.iLastLevelUsedOn = RE_RegisterMedia_GetLevel();
@@ -332,27 +333,24 @@ extern cvar_t *r_modelpoolmegs;
 //
 extern qboolean gbInsideRegisterModel;
 qboolean RE_RegisterModels_LevelLoadEnd(qboolean bDeleteEverythingNotUsedThisLevel /* = qfalse */)
-{	
+{
 	qboolean bAtLeastoneModelFreed = qfalse;
 
 	assert(CachedModels);
 
-	ri.Printf( PRINT_DEVELOPER, S_COLOR_RED "RE_RegisterModels_LevelLoadEnd():\n");
+	ri->Printf( PRINT_DEVELOPER, S_COLOR_RED "RE_RegisterModels_LevelLoadEnd():\n");
 
 	if (gbInsideRegisterModel)
 	{
-		ri.Printf( PRINT_DEVELOPER, "(Inside RE_RegisterModel (z_malloc recovery?), exiting...\n");
+		ri->Printf( PRINT_DEVELOPER, "(Inside RE_RegisterModel (z_malloc recovery?), exiting...\n");
 	}
 	else
 	{
 		int iLoadedModelBytes	=	GetModelDataAllocSize();
 		const int iMaxModelBytes=	r_modelpoolmegs->integer * 1024 * 1024;
 
-		qboolean bEraseOccured = qfalse;
-		for (CachedModels_t::iterator itModel = CachedModels->begin(); itModel != CachedModels->end() && ( bDeleteEverythingNotUsedThisLevel || iLoadedModelBytes > iMaxModelBytes ); bEraseOccured?itModel:++itModel)
-		{			
-			bEraseOccured = qfalse;
-
+		for (CachedModels_t::iterator itModel = CachedModels->begin(); itModel != CachedModels->end() && ( bDeleteEverythingNotUsedThisLevel || iLoadedModelBytes > iMaxModelBytes ); )
+		{
 			CachedEndianedModelBinary_t &CachedModel = (*itModel).second;
 
 			qboolean bDeleteThis = qfalse;
@@ -370,39 +368,32 @@ qboolean RE_RegisterModels_LevelLoadEnd(qboolean bDeleteEverythingNotUsedThisLev
 			//
 			if (bDeleteThis)
 			{
-				LPCSTR psModelName = (*itModel).first.c_str();
-				ri.Printf( PRINT_DEVELOPER, S_COLOR_RED "Dumping \"%s\"", psModelName);
+				const char *psModelName = (*itModel).first.c_str();
+				ri->Printf( PRINT_DEVELOPER, S_COLOR_RED "Dumping \"%s\"", psModelName);
 
 	#ifdef _DEBUG
-				ri.Printf( PRINT_DEVELOPER, S_COLOR_RED ", used on lvl %d\n",CachedModel.iLastLevelUsedOn);
-	#endif				
+				ri->Printf( PRINT_DEVELOPER, S_COLOR_RED ", used on lvl %d\n",CachedModel.iLastLevelUsedOn);
+	#endif
 
 				if (CachedModel.pModelDiskImage) {
-					Z_Free(CachedModel.pModelDiskImage);	
+					Z_Free(CachedModel.pModelDiskImage);
 					//CachedModel.pModelDiskImage = NULL;	// REM for reference, erase() call below negates the need for it.
 					bAtLeastoneModelFreed = qtrue;
 				}
-#ifdef _WIN32
-				itModel = CachedModels->erase(itModel);
-				bEraseOccured = qtrue;
-#else
-				// Both MS and Dinkumware got the map::erase wrong
-				// The STL has the return type as a void
-				CachedModels_t::iterator itTemp;
-				itTemp = itModel;
-				itModel++;
-				CachedModels->erase(itTemp);
-				
-#endif
+				CachedModels->erase(itModel++);
 
-				iLoadedModelBytes = GetModelDataAllocSize();				
+				iLoadedModelBytes = GetModelDataAllocSize();
+			}
+			else
+			{
+				++itModel;
 			}
 		}
 	}
 
-	ri.Printf( PRINT_DEVELOPER, S_COLOR_RED "RE_RegisterModels_LevelLoadEnd(): Ok\n");	
+	ri->Printf( PRINT_DEVELOPER, S_COLOR_RED "RE_RegisterModels_LevelLoadEnd(): Ok\n");
 
-	return bAtLeastoneModelFreed;	
+	return bAtLeastoneModelFreed;
 }
 
 
@@ -410,62 +401,57 @@ qboolean RE_RegisterModels_LevelLoadEnd(qboolean bDeleteEverythingNotUsedThisLev
 // scan through all loaded models and see if their PAK checksums are still valid with the current pure PAK lists,
 //	dump any that aren't (so people can't cheat by using models with huge spikes that show through walls etc)
 //
-// (avoid using ri.xxxx stuff here in case running on dedicated)
+// (avoid using ri->xxxx stuff here in case running on dedicated)
 //
 static void RE_RegisterModels_DumpNonPure(void)
 {
-	ri.Printf( PRINT_DEVELOPER,  "RE_RegisterModels_DumpNonPure():\n");
+	ri->Printf( PRINT_DEVELOPER,  "RE_RegisterModels_DumpNonPure():\n");
 
 	if(!CachedModels) {
 		return;
 	}
-	qboolean bEraseOccured = qfalse;
-	for (CachedModels_t::iterator itModel = CachedModels->begin(); itModel != CachedModels->end(); bEraseOccured?itModel:++itModel)
-	{			
-		bEraseOccured = qfalse;
 
-		LPCSTR						psModelName	 = (*itModel).first.c_str();
+	for (CachedModels_t::iterator itModel = CachedModels->begin(); itModel != CachedModels->end(); /* empty */)
+	{
+		qboolean bEraseOccured = qfalse;
+
+		const char *psModelName	 = (*itModel).first.c_str();
 		CachedEndianedModelBinary_t &CachedModel = (*itModel).second;
 
 		int iCheckSum = -1;
-		int iInPak = ri.FS_FileIsInPAK(psModelName, &iCheckSum);
+		int iInPak = ri->FS_FileIsInPAK(psModelName, &iCheckSum);
 
 		if (iInPak == -1 || iCheckSum != CachedModel.iPAKFileCheckSum)
 		{
-			if (stricmp(sDEFAULT_GLA_NAME ".gla" , psModelName))	// don't dump "*default.gla", that's program internal anyway
+			if (Q_stricmp(sDEFAULT_GLA_NAME ".gla" , psModelName))	// don't dump "*default.gla", that's program internal anyway
 			{
 				// either this is not from a PAK, or it's from a non-pure one, so ditch it...
-				//					
-				ri.Printf( PRINT_DEVELOPER, "Dumping none pure model \"%s\"", psModelName);
+				//
+				ri->Printf( PRINT_DEVELOPER, "Dumping none pure model \"%s\"", psModelName);
 
 				if (CachedModel.pModelDiskImage) {
-					Z_Free(CachedModel.pModelDiskImage);	
+					Z_Free(CachedModel.pModelDiskImage);
 					//CachedModel.pModelDiskImage = NULL;	// REM for reference, erase() call below negates the need for it.
 				}
-#ifdef _WIN32
-				itModel = CachedModels->erase(itModel);
+				CachedModels->erase(itModel++);
 				bEraseOccured = qtrue;
-#else
-				// Both MS and Dinkumware got the map::erase wrong
-				// The STL has the return type as a void
-				CachedModels_t::iterator itTemp;
-				itTemp = itModel;
-				itModel++;
-				CachedModels->erase(itTemp);
-
-#endif
 			}
+		}
+
+		if ( !bEraseOccured )
+		{
+			++itModel;
 		}
 	}
 
-	ri.Printf( PRINT_DEVELOPER, "RE_RegisterModels_DumpNonPure(): Ok\n");	
+	ri->Printf( PRINT_DEVELOPER, "RE_RegisterModels_DumpNonPure(): Ok\n");
 }
 
 void RE_RegisterModels_Info_f( void )
-{	
+{
 	int iTotalBytes = 0;
 	if(!CachedModels) {
-		Com_Printf ("%d bytes total (%.2fMB)\n",iTotalBytes, (float)iTotalBytes / 1024.0f / 1024.0f);
+		ri->Printf( PRINT_ALL, "%d bytes total (%.2fMB)\n",iTotalBytes, (float)iTotalBytes / 1024.0f / 1024.0f);
 		return;
 	}
 
@@ -473,22 +459,22 @@ void RE_RegisterModels_Info_f( void )
 	int iModel  = 0;
 
 	for (CachedModels_t::iterator itModel = CachedModels->begin(); itModel != CachedModels->end(); ++itModel,iModel++)
-	{	
+	{
 		CachedEndianedModelBinary_t &CachedModel = (*itModel).second;
 
-		Com_Printf ("%d/%d: \"%s\" (%d bytes)",iModel,iModels,(*itModel).first.c_str(),CachedModel.iAllocSize );
+		ri->Printf( PRINT_ALL, "%d/%d: \"%s\" (%d bytes)",iModel,iModels,(*itModel).first.c_str(),CachedModel.iAllocSize );
 
 		#ifdef _DEBUG
-		Com_Printf (", lvl %d\n",CachedModel.iLastLevelUsedOn);
+		ri->Printf( PRINT_ALL, ", lvl %d\n",CachedModel.iLastLevelUsedOn);
 		#endif
 
 		iTotalBytes += CachedModel.iAllocSize;
 	}
-	Com_Printf ("%d bytes total (%.2fMB)\n",iTotalBytes, (float)iTotalBytes / 1024.0f / 1024.0f);
+	ri->Printf( PRINT_ALL, "%d bytes total (%.2fMB)\n",iTotalBytes, (float)iTotalBytes / 1024.0f / 1024.0f);
 }
 
 
-// (don't use ri.xxx functions since the renderer may not be running here)...
+// (don't use ri->xxx functions since the renderer may not be running here)...
 //
 static void RE_RegisterModels_DeleteAll(void)
 {
@@ -496,24 +482,20 @@ static void RE_RegisterModels_DeleteAll(void)
 		return;	//argh!
 	}
 
-#ifdef _WIN32
 	for (CachedModels_t::iterator itModel = CachedModels->begin(); itModel != CachedModels->end(); )
 	{
 		CachedEndianedModelBinary_t &CachedModel = (*itModel).second;
 
 		if (CachedModel.pModelDiskImage) {
-			Z_Free(CachedModel.pModelDiskImage);					
+			Z_Free(CachedModel.pModelDiskImage);
 		}
 
-		itModel = CachedModels->erase(itModel);			
+		CachedModels->erase(itModel++);
 	}
-#else
-	CachedModels->erase(CachedModels->begin(),CachedModels->end());
-#endif
 }
 
 
-// do not use ri.xxx functions in here, the renderer may not be running (ie. if on a dedicated server)...
+// do not use ri->xxx functions in here, the renderer may not be running (ie. if on a dedicated server)...
 //
 static int giRegisterMedia_CurrentLevel=0;
 void RE_RegisterMedia_LevelLoadBegin(const char *psMapName, ForceReload_e eForceReload)
@@ -529,7 +511,7 @@ void RE_RegisterMedia_LevelLoadBegin(const char *psMapName, ForceReload_e eForce
 	}
 	else
 	{
-		if ( ri.Cvar_VariableIntegerValue( "sv_pure" ) )
+		if ( ri->Cvar_VariableIntegerValue( "sv_pure" ) )
 		{
 			RE_RegisterModels_DumpNonPure();
 		}
@@ -546,10 +528,10 @@ void RE_RegisterMedia_LevelLoadBegin(const char *psMapName, ForceReload_e eForce
 //	}
 
 	// at some stage I'll probably want to put some special logic here, like not incrementing the level number
-	//	when going into a map like "brig" or something, so returning to the previous level doesn't require an 
+	//	when going into a map like "brig" or something, so returning to the previous level doesn't require an
 	//	asset reload etc, but for now...
 	//
-	// only bump level number if we're not on the same level. 
+	// only bump level number if we're not on the same level.
 	//	Note that this will hide uncached models, which is perhaps a bad thing?...
 	//
 	static char sPrevMapName[MAX_QPATH]={0};
@@ -572,9 +554,9 @@ void RE_RegisterMedia_LevelLoadEnd(void)
 	RE_RegisterModels_LevelLoadEnd(qfalse);
 
 	RE_RegisterImages_LevelLoadEnd();
-	ri.SND_RegisterAudio_LevelLoadEnd(qfalse);
+	ri->SND_RegisterAudio_LevelLoadEnd(qfalse);
 //	RE_InitDissolve();
-	ri.S_RestartMusic();
+	ri->S_RestartMusic();
 }
 
 
@@ -662,7 +644,7 @@ Ghoul2 Insert End
 */
 
 //rww - Please forgive me for all of the below. Feel free to destroy it and replace it with something better.
-//You obviously can't touch anything relating to shaders or ri. functions here in case a dedicated
+//You obviously can't touch anything relating to shaders or ri-> functions here in case a dedicated
 //server is running, which is the entire point of having these seperate functions. If anything major
 //is changed in the non-server-only versions of these functions it would be wise to incorporate it
 //here as well.
@@ -678,7 +660,7 @@ qboolean ServerLoadMDXA( model_t *mod, void *buffer, const char *mod_name, qbool
 	int					version;
 	int					size;
 
-#ifndef _M_IX86
+#if 0 //#ifndef _M_IX86
 	int					j, k, i;
 	int					frameSize;
 	mdxaFrame_t			*cframe;
@@ -688,16 +670,16 @@ qboolean ServerLoadMDXA( model_t *mod, void *buffer, const char *mod_name, qbool
  	pinmodel = (mdxaHeader_t *)buffer;
 	//
 	// read some fields from the binary, but only LittleLong() them when we know this wasn't an already-cached model...
-	//	
+	//
 	version = (pinmodel->version);
 	size	= (pinmodel->ofsEnd);
 
 	if (!bAlreadyCached)
 	{
-		version = LittleLong(version);
-		size	= LittleLong(size);
+		LL(version);
+		LL(size);
 	}
-	
+
 	if (version != MDXA_VERSION) {
 		return qfalse;
 	}
@@ -713,8 +695,8 @@ qboolean ServerLoadMDXA( model_t *mod, void *buffer, const char *mod_name, qbool
 
 	if (!bAlreadyFound)
 	{
-		// horrible new hackery, if !bAlreadyFound then we've just done a tag-morph, so we need to set the 
-		//	bool reference passed into this function to true, to tell the caller NOT to do an ri.FS_Freefile since
+		// horrible new hackery, if !bAlreadyFound then we've just done a tag-morph, so we need to set the
+		//	bool reference passed into this function to true, to tell the caller NOT to do an ri->FS_Freefile since
 		//	we've hijacked that memory block...
 		//
 		// Aaaargh. Kill me now...
@@ -740,7 +722,7 @@ qboolean ServerLoadMDXA( model_t *mod, void *buffer, const char *mod_name, qbool
 		return qtrue;	// All done, stop here, do not LittleLong() etc. Do not pass go...
 	}
 
-#ifndef _M_IX86
+#if 0 //#ifndef _M_IX86
 
 	//
 	// optimisation, we don't bother doing this for standard intel case since our data's already in that format...
@@ -748,7 +730,7 @@ qboolean ServerLoadMDXA( model_t *mod, void *buffer, const char *mod_name, qbool
 
 	// swap all the skeletal info
 	boneInfo = (mdxaSkel_t *)( (byte *)mdxa + mdxa->ofsSkel);
-	for ( i = 0 ; i < mdxa->numBones ; i++) 
+	for ( i = 0 ; i < mdxa->numBones ; i++)
 	{
 		LL(boneInfo->numChildren);
 		LL(boneInfo->parent);
@@ -764,17 +746,17 @@ qboolean ServerLoadMDXA( model_t *mod, void *buffer, const char *mod_name, qbool
 
 	// swap all the frames
 	frameSize = (int)( &((mdxaFrame_t *)0)->bones[ mdxa->numBones ] );
-	for ( i = 0 ; i < mdxa->numFrames ; i++) 
+	for ( i = 0 ; i < mdxa->numFrames ; i++)
 	{
 		cframe = (mdxaFrame_t *) ( (byte *)mdxa + mdxa->ofsFrames + i * frameSize );
    		cframe->radius = LittleFloat( cframe->radius );
-		for ( j = 0 ; j < 3 ; j++ ) 
+		for ( j = 0 ; j < 3 ; j++ )
 		{
 			cframe->bounds[0][j] = LittleFloat( cframe->bounds[0][j] );
 			cframe->bounds[1][j] = LittleFloat( cframe->bounds[1][j] );
     		cframe->localOrigin[j] = LittleFloat( cframe->localOrigin[j] );
 		}
-		for ( j = 0 ; j < mdxa->numBones * sizeof( mdxaBone_t ) / 2 ; j++ ) 
+		for ( j = 0 ; j < mdxa->numBones * sizeof( mdxaBone_t ) / 2 ; j++ )
 		{
 			((short *)cframe->bones)[j] = LittleShort( ((short *)cframe->bones)[j] );
 		}
@@ -795,10 +777,10 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 	mdxmSurface_t		*surf;
 	int					version;
 	int					size;
-	shader_t			*sh;
+	//shader_t			*sh;
 	mdxmSurfHierarchy_t	*surfInfo;
 
-#ifndef _M_IX86
+#if 0 //#ifndef _M_IX86
 	int					k;
 	int					frameSize;
 	mdxmTag_t			*tag;
@@ -807,18 +789,18 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
  	mdxmFrame_t			*cframe;
 	int					*boneRef;
 #endif
-    
+
 	pinmodel= (mdxmHeader_t *)buffer;
 	//
 	// read some fields from the binary, but only LittleLong() them when we know this wasn't an already-cached model...
-	//	
+	//
 	version = (pinmodel->version);
 	size	= (pinmodel->ofsEnd);
 
 	if (!bAlreadyCached)
 	{
-		version = LittleLong(version);
-		size	= LittleLong(size);
+		LL(version);
+		LL(size);
 	}
 
 	if (version != MDXM_VERSION) {
@@ -826,8 +808,8 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 	}
 
 	mod->type	   = MOD_MDXM;
-	mod->dataSize += size;	
-	
+	mod->dataSize += size;
+
 	qboolean bAlreadyFound = qfalse;
 	mdxm = mod->mdxm = (mdxmHeader_t*) //Hunk_Alloc( size );
 										RE_RegisterServerModels_Malloc(size, buffer, mod_name, &bAlreadyFound, TAG_MODEL_GLM);
@@ -836,8 +818,8 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 
 	if (!bAlreadyFound)
 	{
-		// horrible new hackery, if !bAlreadyFound then we've just done a tag-morph, so we need to set the 
-		//	bool reference passed into this function to true, to tell the caller NOT to do an ri.FS_Freefile since
+		// horrible new hackery, if !bAlreadyFound then we've just done a tag-morph, so we need to set the
+		//	bool reference passed into this function to true, to tell the caller NOT to do an ri->FS_Freefile since
 		//	we've hijacked that memory block...
 		//
 		// Aaaargh. Kill me now...
@@ -854,10 +836,10 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 		LL(mdxm->ofsSurfHierarchy);
 		LL(mdxm->ofsEnd);
 	}
-		
+
 	// first up, go load in the animation file we need that has the skeletal animation info for this model
 	mdxm->animIndex = RE_RegisterServerModel(va ("%s.gla",mdxm->animName));
-	if (!mdxm->animIndex) 
+	if (!mdxm->animIndex)
 	{
 		return qfalse;
 	}
@@ -870,7 +852,7 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 	}
 
 	surfInfo = (mdxmSurfHierarchy_t *)( (byte *)mdxm + mdxm->ofsSurfHierarchy);
- 	for ( i = 0 ; i < mdxm->numSurfaces ; i++) 
+ 	for ( i = 0 ; i < mdxm->numSurfaces ; i++)
 	{
 		LL(surfInfo->numChildren);
 		LL(surfInfo->parentIndex);
@@ -882,17 +864,17 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 		}
 
 		// We will not be using shaders on the server.
-		sh = 0;
+		//sh = 0;
 		// insert it in the surface list
-		
+
 		surfInfo->shaderIndex = 0;
 
 		RE_RegisterModels_StoreShaderRequest(mod_name, &surfInfo->shader[0], &surfInfo->shaderIndex);
 
 		// find the next surface
-		surfInfo = (mdxmSurfHierarchy_t *)( (byte *)surfInfo + (int)( &((mdxmSurfHierarchy_t *)0)->childIndexes[ surfInfo->numChildren ] ));
+		surfInfo = (mdxmSurfHierarchy_t *)( (byte *)surfInfo + (intptr_t)( &((mdxmSurfHierarchy_t *)0)->childIndexes[ surfInfo->numChildren ] ));
   	}
-	
+
 	// swap all the LOD's	(we need to do the middle part of this even for intel, because of shader reg and err-check)
 	lod = (mdxmLOD_t *) ( (byte *)mdxm + mdxm->ofsLODs );
 	for ( l = 0 ; l < mdxm->numLODs ; l++)
@@ -902,7 +884,7 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 		LL(lod->ofsEnd);
 		// swap all the surfaces
 		surf = (mdxmSurface_t *) ( (byte *)lod + sizeof (mdxmLOD_t) + (mdxm->numSurfaces * sizeof(mdxmLODSurfOffset_t)) );
-		for ( i = 0 ; i < mdxm->numSurfaces ; i++) 
+		for ( i = 0 ; i < mdxm->numSurfaces ; i++)
 		{
 			LL(surf->numTriangles);
 			LL(surf->ofsTriangles);
@@ -915,34 +897,34 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 //			LL(surf->maxVertBoneWeights);
 
 			triCount += surf->numTriangles;
-										
+
 			if ( surf->numVerts > SHADER_MAX_VERTEXES ) {
 				return qfalse;
 			}
 			if ( surf->numTriangles*3 > SHADER_MAX_INDEXES ) {
 				return qfalse;
 			}
-		
+
 			// change to surface identifier
 			surf->ident = SF_MDX;
 
 			// register the shaders
-#ifndef _M_IX86
+#if 0 //#ifndef _M_IX86
 //
 // optimisation, we don't bother doing this for standard intel case since our data's already in that format...
 //
-			// FIXME - is this correct? 
+			// FIXME - is this correct?
 			// do all the bone reference data
 			boneRef = (int *) ( (byte *)surf + surf->ofsBoneReferences );
-			for ( j = 0 ; j < surf->numBoneReferences ; j++ ) 
+			for ( j = 0 ; j < surf->numBoneReferences ; j++ )
 			{
 					LL(boneRef[j]);
 			}
 
-			
+
 			// swap all the triangles
 			tri = (mdxmTriangle_t *) ( (byte *)surf + surf->ofsTriangles );
-			for ( j = 0 ; j < surf->numTriangles ; j++, tri++ ) 
+			for ( j = 0 ; j < surf->numTriangles ; j++, tri++ )
 			{
 				LL(tri->indexes[0]);
 				LL(tri->indexes[1]);
@@ -951,7 +933,7 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 
 			// swap all the vertexes
 			v = (mdxmVertex_t *) ( (byte *)surf + surf->ofsVerts );
-			for ( j = 0 ; j < surf->numVerts ; j++ ) 
+			for ( j = 0 ; j < surf->numVerts ; j++ )
 			{
 				v->normal[0] = LittleFloat( v->normal[0] );
 				v->normal[1] = LittleFloat( v->normal[1] );
@@ -965,7 +947,7 @@ qboolean ServerLoadMDXM( model_t *mod, void *buffer, const char *mod_name, qbool
 				v->offset[1] = LittleFloat( v->offset[1] );
 				v->offset[2] = LittleFloat( v->offset[2] );
 
-				for ( k = 0 ; k < /*v->numWeights*/surf->maxVertBoneWeights ; k++ ) 
+				for ( k = 0 ; k < /*v->numWeights*/surf->maxVertBoneWeights ; k++ )
 				{
 					v->weights[k].boneIndex = LittleLong( v->weights[k].boneIndex );
 					v->weights[k].boneWeight = LittleFloat( v->weights[k].boneWeight );
@@ -1011,7 +993,7 @@ Ghoul2 Insert End
 
 	if (!r_noServerGhoul2)
 	{ //keep it from choking when it gets to these checks in the g2 code. Registering all r_ cvars for the server would be a Bad Thing though.
-		r_noServerGhoul2 = ri.Cvar_Get( "r_noserverghoul2", "0", 0);
+		r_noServerGhoul2 = ri->Cvar_Get( "r_noserverghoul2", "0", 0);
 	}
 
 	if ( !name || !name[0] ) {
@@ -1041,7 +1023,7 @@ Ghoul2 Insert End
 	Q_strncpyz( mod->name, name, sizeof( mod->name ) );
 
 	// make sure the render thread is stopped
-	R_SyncRenderThread();
+	R_IssuePendingRenderCommands();
 
 	int iLODStart = 0;
 	if (strstr (name, ".md3")) {
@@ -1069,22 +1051,22 @@ Ghoul2 Insert End
 			strcat( filename, namebuf );
 		}
 
-		qboolean bAlreadyCached = qfalse;		
+		qboolean bAlreadyCached = qfalse;
 		if (!RE_RegisterModels_GetDiskFile(filename, (void **)&buf, &bAlreadyCached))
 		{
 			continue;
 		}
-		
+
 		//loadmodel = mod;	// this seems to be fairly pointless
 
 		// important that from now on we pass 'filename' instead of 'name' to all model load functions,
 		//	because 'filename' accounts for any LOD mangling etc so guarantees unique lookups for yet more
 		//	internal caching...
-		//		
+		//
 		ident = *(unsigned *)buf;
 		if (!bAlreadyCached)
 		{
-			ident = LittleLong(ident);
+			LL(ident);
 		}
 
 		switch (ident)
@@ -1099,9 +1081,9 @@ Ghoul2 Insert End
 			default:
 				goto fail;
 		}
-		
+
 		if (!bAlreadyCached){	// important to check!!
-			ri.FS_FreeFile (buf);
+			ri->FS_FreeFile (buf);
 		}
 
 		if ( !loaded ) {
@@ -1174,12 +1156,12 @@ Ghoul2 Insert End
 */
 
 	if ( !name || !name[0] ) {
-		Com_Printf ("RE_RegisterModel: NULL name\n" );
+		ri->Printf( PRINT_ALL, "RE_RegisterModel: NULL name\n" );
 		return 0;
 	}
 
 	if ( strlen( name ) >= MAX_QPATH ) {
-		ri.Printf( PRINT_DEVELOPER, S_COLOR_RED "Model name exceeds MAX_QPATH\n" );
+		ri->Printf( PRINT_DEVELOPER, S_COLOR_RED "Model name exceeds MAX_QPATH\n" );
 		return 0;
 	}
 
@@ -1187,7 +1169,7 @@ Ghoul2 Insert End
 Ghoul2 Insert Start
 */
 //	if (!tr.registered) {
-//		Com_Printf (S_COLOR_YELLOW  "RE_RegisterModel (%s) called before ready!\n",name );
+//		ri->Printf( PRINT_ALL, S_COLOR_YELLOW  "RE_RegisterModel (%s) called before ready!\n",name );
 //		return 0;
 //	}
 	//
@@ -1222,14 +1204,14 @@ Ghoul2 Insert Start
 		RE_LoadWorldMap_Actual(va("maps/%s.bsp", name + 1), tr.bspModels[tr.numBSPModels - 1], tr.numBSPModels);
 		Com_sprintf(temp, MAX_QPATH, "*%d-0", tr.numBSPModels);
 		hash = generateHashValue(temp, FILE_HASH_SIZE);
-		for (mh=mhHashTable[hash]; mh; mh=mh->next) 
+		for (mh=mhHashTable[hash]; mh; mh=mh->next)
 		{
-			if (Q_stricmp(mh->name, temp) == 0) 
+			if (Q_stricmp(mh->name, temp) == 0)
 			{
 				return mh->handle;
 			}
 		}
-		
+
 		return 0;
 	}
 
@@ -1248,7 +1230,7 @@ Ghoul2 Insert End
 	// allocate a new model_t
 
 	if ( ( mod = R_AllocModel() ) == NULL ) {
-		Com_Printf (S_COLOR_YELLOW  "RE_RegisterModel: R_AllocModel() failed for '%s'\n", name);
+		ri->Printf( PRINT_ALL, S_COLOR_YELLOW  "RE_RegisterModel: R_AllocModel() failed for '%s'\n", name);
 		return 0;
 	}
 
@@ -1256,7 +1238,7 @@ Ghoul2 Insert End
 	Q_strncpyz( mod->name, name, sizeof( mod->name ) );
 
 	// make sure the render thread is stopped
-	R_SyncRenderThread();
+	R_IssuePendingRenderCommands();
 
 	int iLODStart = 0;
 	if (strstr (name, ".md3")) {
@@ -1284,33 +1266,33 @@ Ghoul2 Insert End
 			strcat( filename, namebuf );
 		}
 
-		qboolean bAlreadyCached = qfalse;		
+		qboolean bAlreadyCached = qfalse;
 		if (!RE_RegisterModels_GetDiskFile(filename, (void **)&buf, &bAlreadyCached))
 		{
 			continue;
 		}
-		
+
 		//loadmodel = mod;	// this seems to be fairly pointless
 
 		// important that from now on we pass 'filename' instead of 'name' to all model load functions,
 		//	because 'filename' accounts for any LOD mangling etc so guarantees unique lookups for yet more
 		//	internal caching...
-		//		
+		//
 		ident = *(unsigned *)buf;
 		if (!bAlreadyCached)
 		{
-			ident = LittleLong(ident);
+			LL(ident);
 		}
 
 		switch (ident)
 		{
-			// if you add any new types of model load in this switch-case, tell me, 
+			// if you add any new types of model load in this switch-case, tell me,
 			//	or copy what I've done with the cache scheme (-ste).
 			//
 			case MDXA_IDENT:
 				loaded = R_LoadMDXA( mod, buf, filename, bAlreadyCached );
 				break;
-		
+
 			case MDXM_IDENT:
 				loaded = R_LoadMDXM( mod, buf, filename, bAlreadyCached );
 				break;
@@ -1320,12 +1302,12 @@ Ghoul2 Insert End
 				break;
 
 			default:
-				Com_Printf (S_COLOR_YELLOW"RE_RegisterModel: unknown fileid for %s\n", filename);
+				ri->Printf( PRINT_ALL, S_COLOR_YELLOW"RE_RegisterModel: unknown fileid for %s\n", filename);
 				goto fail;
 		}
-		
+
 		if (!bAlreadyCached){	// important to check!!
-			ri.FS_FreeFile (buf);
+			ri->FS_FreeFile (buf);
 		}
 
 		if ( !loaded ) {
@@ -1373,7 +1355,7 @@ Ghoul2 Insert End
 	}
 #ifdef _DEBUG
 	else {
-		Com_Printf (S_COLOR_YELLOW"RE_RegisterModel: couldn't load %s\n", name);
+		ri->Printf( PRINT_ALL, S_COLOR_YELLOW"RE_RegisterModel: couldn't load %s\n", name);
 	}
 #endif
 
@@ -1395,7 +1377,7 @@ qhandle_t RE_RegisterModel( const char *name )
 	const qboolean bWhatitwas = gbInsideRegisterModel;
 	gbInsideRegisterModel = qtrue;	// !!!!!!!!!!!!!!
 
-		qhandle_t q = RE_RegisterModel_Actual( name );
+	qhandle_t q = RE_RegisterModel_Actual( name );
 
 	gbInsideRegisterModel = bWhatitwas;
 
@@ -1417,7 +1399,7 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 	int					version;
 	int					size;
 
-#ifndef _M_IX86
+#if 0 //#ifndef _M_IX86
 	md3Frame_t			*frame;
 	md3Triangle_t		*tri;
 	md3St_t				*st;
@@ -1435,17 +1417,17 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 
 	if (!bAlreadyCached)
 	{
-		version = LittleLong(version);
-		size	= LittleLong(size);
+		LL(version);
+		LL(size);
 	}
-	
+
 	if (version != MD3_VERSION) {
-		Com_Printf (S_COLOR_YELLOW  "R_LoadMD3: %s has wrong version (%i should be %i)\n",
+		ri->Printf( PRINT_ALL, S_COLOR_YELLOW  "R_LoadMD3: %s has wrong version (%i should be %i)\n",
 				 mod_name, version, MD3_VERSION);
 		return qfalse;
 	}
 
-	mod->type      = MOD_MESH;	
+	mod->type      = MOD_MESH;
 	mod->dataSize += size;
 
 	qboolean bAlreadyFound = qfalse;
@@ -1455,16 +1437,16 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 	assert(bAlreadyCached == bAlreadyFound);	// I should probably eliminate 'bAlreadyFound', but wtf?
 
 	if (!bAlreadyFound)
-	{	
-		// horrible new hackery, if !bAlreadyFound then we've just done a tag-morph, so we need to set the 
-		//	bool reference passed into this function to true, to tell the caller NOT to do an ri.FS_Freefile since
+	{
+		// horrible new hackery, if !bAlreadyFound then we've just done a tag-morph, so we need to set the
+		//	bool reference passed into this function to true, to tell the caller NOT to do an ri->FS_Freefile since
 		//	we've hijacked that memory block...
 		//
 		// Aaaargh. Kill me now...
 		//
 		bAlreadyCached = qtrue;
 		assert( mod->md3[lod] == buffer );
-//		memcpy( mod->md3[lod], buffer, size );	// and don't do this now, since it's the same thing		
+//		memcpy( mod->md3[lod], buffer, size );	// and don't do this now, since it's the same thing
 
 		LL(mod->md3[lod]->ident);
 		LL(mod->md3[lod]->version);
@@ -1478,7 +1460,7 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 	}
 
 	if ( mod->md3[lod]->numFrames < 1 ) {
-		Com_Printf (S_COLOR_YELLOW  "R_LoadMD3: %s has no frames\n", mod_name );
+		ri->Printf( PRINT_ALL, S_COLOR_YELLOW  "R_LoadMD3: %s has no frames\n", mod_name );
 		return qfalse;
 	}
 
@@ -1487,7 +1469,7 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 		return qtrue;	// All done. Stop, go no further, do not pass Go...
 	}
 
-#ifndef _M_IX86
+#if 0 //#ifndef _M_IX86
 	//
 	// optimisation, we don't bother doing this for standard intel case since our data's already in that format...
 	//
@@ -1528,16 +1510,16 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
         LL(surf->ofsSt);
         LL(surf->ofsXyzNormals);
         LL(surf->ofsEnd);
-		
-		if ( surf->numVerts > SHADER_MAX_VERTEXES ) {
-			Com_Error (ERR_DROP, "R_LoadMD3: %s has more than %i verts on a surface (%i)",
-				mod_name, SHADER_MAX_VERTEXES, surf->numVerts );
+
+		if ( surf->numVerts >= SHADER_MAX_VERTEXES ) {
+			Com_Error (ERR_DROP, "R_LoadMD3: %s has more than %i verts on %s (%i)",
+				mod_name, SHADER_MAX_VERTEXES - 1, surf->name[0] ? surf->name : "a surface", surf->numVerts );
 		}
-		if ( surf->numTriangles*3 > SHADER_MAX_INDEXES ) {
-			Com_Error (ERR_DROP, "R_LoadMD3: %s has more than %i triangles on a surface (%i)",
-				mod_name, SHADER_MAX_INDEXES / 3, surf->numTriangles );
+		if ( surf->numTriangles*3 >= SHADER_MAX_INDEXES ) {
+			Com_Error (ERR_DROP, "R_LoadMD3: %s has more than %i triangles on %s (%i)",
+				mod_name, ( SHADER_MAX_INDEXES / 3 ) - 1, surf->name[0] ? surf->name : "a surface", surf->numTriangles );
 		}
-	
+
 		// change to surface identifier
 		surf->ident = SF_MD3;
 
@@ -1565,7 +1547,7 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 			RE_RegisterModels_StoreShaderRequest(mod_name, &shader->name[0], &shader->shaderIndex);
         }
 
-#ifndef _M_IX86
+#if 0 //#ifndef _M_IX86
 //
 // optimisation, we don't bother doing this for standard intel case since our data's already in that format...
 //
@@ -1587,7 +1569,7 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 
 		// swap all the XyzNormals
         xyz = (md3XyzNormal_t *) ( (byte *)surf + surf->ofsXyzNormals );
-        for ( j = 0 ; j < surf->numVerts * surf->numFrames ; j++, xyz++ ) 
+        for ( j = 0 ; j < surf->numVerts * surf->numFrames ; j++, xyz++ )
 		{
             xyz->xyz[0] = LittleShort( xyz->xyz[0] );
             xyz->xyz[1] = LittleShort( xyz->xyz[1] );
@@ -1600,7 +1582,7 @@ static qboolean R_LoadMD3 (model_t *mod, int lod, void *buffer, const char *mod_
 		// find the next surface
 		surf = (md3Surface_t *)( (byte *)surf + surf->ofsEnd );
 	}
-    
+
 	return qtrue;
 }
 
@@ -1615,7 +1597,7 @@ void RE_BeginRegistration( glconfig_t *glconfigOut ) {
 
 	*glconfigOut = glConfig;
 
-	R_SyncRenderThread();
+	R_IssuePendingRenderCommands();
 
 	tr.viewCluster = -1;		// force markleafs to regenerate
 
@@ -1702,14 +1684,14 @@ void R_Modellist_f( void ) {
 				lods++;
 			}
 		}
-		Com_Printf ("%8i : (%i) %s\n",mod->dataSize, lods, mod->name );
+		ri->Printf( PRINT_ALL, "%8i : (%i) %s\n",mod->dataSize, lods, mod->name );
 		total += mod->dataSize;
 	}
-	Com_Printf ("%8i : Total models\n", total );
+	ri->Printf( PRINT_ALL, "%8i : Total models\n", total );
 
 #if	0		// not working right with new hunk
 	if ( tr.world ) {
-		Com_Printf ("\n%8i : %s\n", tr.world->dataSize, tr.world->name );
+		ri->Printf( PRINT_ALL, "\n%8i : %s\n", tr.world->dataSize, tr.world->name );
 	}
 #endif
 }
@@ -1747,7 +1729,7 @@ static md3Tag_t *R_GetTag( md3Header_t *mod, int frame, const char *tagName ) {
 R_LerpTag
 ================
 */
-int R_LerpTag( orientation_t *tag, qhandle_t handle, int startFrame, int endFrame, 
+int R_LerpTag( orientation_t *tag, qhandle_t handle, int startFrame, int endFrame,
 					 float frac, const char *tagName ) {
 	md3Tag_t	*start, *end;
 	int		i;

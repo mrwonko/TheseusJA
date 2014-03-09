@@ -26,10 +26,10 @@ This file is part of Jedi Academy.
 
 
 #include <assert.h>
-#include "../renderer/tr_local.h"
+#include "tr_local.h"
 #include "../qcommon/qcommon.h"
-#include "glw_win.h"
-#include "win_local.h"
+#include "../win32/glw_win.h"
+#include "../win32/win_local.h"
 
 static unsigned short s_oldHardwareGamma[3][256];
 
@@ -60,7 +60,7 @@ void WG_CheckHardwareGamma( void )
 				 ( HIBYTE( s_oldHardwareGamma[2][255] ) <= HIBYTE( s_oldHardwareGamma[2][0] ) ) )
 			{
 				glConfig.deviceSupportsGamma = qfalse;
-				VID_Printf( PRINT_WARNING, "WARNING: device has broken gamma support, generated gamma.dat\n" );
+				ri.Printf( PRINT_WARNING, "WARNING: device has broken gamma support, generated gamma.dat\n" );
 			}
 
 			//
@@ -71,7 +71,7 @@ void WG_CheckHardwareGamma( void )
 			{
 				int g;
 
-				VID_Printf( PRINT_WARNING, "WARNING: suspicious gamma tables, using linear ramp for restoration\n" );
+				ri.Printf( PRINT_WARNING, "WARNING: suspicious gamma tables, using linear ramp for restoration\n" );
 
 				for ( g = 0; g < 255; g++ )
 				{

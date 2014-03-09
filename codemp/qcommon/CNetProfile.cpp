@@ -3,9 +3,9 @@
 
 #ifdef _DONETPROFILE_
 
-#pragma warning( disable : 4786) 
-#pragma warning( disable : 4100) 
-#pragma warning( disable : 4663) 
+#pragma warning( disable : 4786)
+#pragma warning( disable : 4100)
+#pragma warning( disable : 4663)
 
 #include <windows.h>
 #include <stdio.h>
@@ -45,7 +45,7 @@ public:
 			mFieldCounts[fieldName]+=(unsigned int)sizeBytes;
 		}
 	}
-	
+
 	void IncTime(int msec)
 	{
 		mElapsedTime+=msec;
@@ -55,8 +55,8 @@ public:
 	{
 		float									totalBytes=0;
 		multimap<unsigned int,hstring>			sort;
-		map<hstring,unsigned int>::iterator		f;		
-		for(f=mFieldCounts.begin();f!=mFieldCounts.end();f++)
+		map<hstring,unsigned int>::iterator		f;
+		for(f=mFieldCounts.begin();f!=mFieldCounts.end();++f)
 		{
 			sort.insert(pair<unsigned int,hstring> ((*f).second,(*f).first));
 			totalBytes+=(*f).second;
@@ -71,7 +71,7 @@ public:
 			    (unsigned int)((totalBytes/mElapsedTime)*1000));
 		Sleep(10);
 		Com_OPrintf("%s", msg);
-		for(j=sort.begin();j!=sort.end();j++)
+		for(j=sort.begin();j!=sort.end();++j)
 		{
 			percent=(((float)(*j).first)/totalBytes)*100.0f;
 			assert(strlen((*j).second.c_str())<1024);

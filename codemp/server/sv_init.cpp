@@ -2,17 +2,13 @@
 #include "qcommon/exe_headers.h"
 
 #include "server.h"
-
 /*
 Ghoul2 Insert Start
 */
 #include "ghoul2/G2.h"
-
-#if !defined (MINIHEAP_H_INC)
 #include "qcommon/MiniHeap.h"
-#endif
-
 #include "qcommon/stringed_ingame.h"
+#include "sv_gameapi.h"
 
 /*
 ===============
@@ -73,7 +69,7 @@ void SV_UpdateConfigstrings(client_t *client)
 {
 	int index;
 
-	for( index = 0; index <= MAX_CONFIGSTRINGS; index++ ) {
+	for( index = 0; index < MAX_CONFIGSTRINGS; index++ ) {
 		// if the CS hasn't changed since we went to CS_PRIMED, ignore
 		if(!client->csUpdated[index])
 			continue;
@@ -203,7 +199,7 @@ baseline will be transmitted
 */
 void SV_CreateBaseline( void ) {
 	sharedEntity_t *svent;
-	int				entnum;	
+	int				entnum;
 
 	for ( entnum = 1; entnum < sv.num_entities ; entnum++ ) {
 		svent = SV_GentityNum(entnum);
@@ -256,13 +252,13 @@ void SV_Startup( void ) {
 
 	svs.clients = (struct client_s *)Z_Malloc (sizeof(client_t) * sv_maxclients->integer, TAG_CLIENTS, qtrue );
 	if ( com_dedicated->integer ) {
-		svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * 64;
+		svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * MAX_SNAPSHOT_ENTITIES;
 		Cvar_Set( "r_ghoul2animsmooth", "0");
 		Cvar_Set( "r_ghoul2unsqashaftersmooth", "0");
 
 	} else {
 		// we don't need nearly as many when playing locally
-		svs.numSnapshotEntities = sv_maxclients->integer * 4 * 64;
+		svs.numSnapshotEntities = sv_maxclients->integer * 4 * MAX_SNAPSHOT_ENTITIES;
 	}
 	svs.initialized = qtrue;
 
@@ -344,13 +340,13 @@ void SV_ChangeMaxClients( void ) {
 
 	// free the old clients on the hunk
 	Hunk_FreeTempMemory( oldClients );
-	
+
 	// allocate new snapshot entities
 	if ( com_dedicated->integer ) {
-		svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * 64;
+		svs.numSnapshotEntities = sv_maxclients->integer * PACKET_BACKUP * MAX_SNAPSHOT_ENTITIES;
 	} else {
 		// we don't need nearly as many when playing locally
-		svs.numSnapshotEntities = sv_maxclients->integer * 4 * 64;
+		svs.numSnapshotEntities = sv_maxclients->integer * 4 * MAX_SNAPSHOT_ENTITIES;
 	}
 }
 
@@ -394,14 +390,8 @@ void SV_TouchCGame(void) {
 	fileHandle_t	f;
 	char filename[MAX_QPATH];
 
-	if (Cvar_VariableValue( "vm_cgame" ))
-	{
-		Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", "cgame" );
-	}
-	else
-	{
-		Com_sprintf( filename, sizeof(filename), "cgamex86.dll" );
-	}
+	Com_sprintf( filename, sizeof(filename), "cgamex86.dll" );
+
 	FS_FOpenFileRead( filename, &f, qfalse );
 	if ( f ) {
 		FS_FCloseFile( f );
@@ -414,19 +404,21 @@ void SV_SendMapChange(void)
 
 	if (svs.clients)
 	{
-		for (i=0 ; i<sv_maxclients->integer ; i++) 
+		for (i=0 ; i<sv_maxclients->integer ; i++)
 		{
-			if (svs.clients[i].state >= CS_CONNECTED) 
+			if (svs.clients[i].state >= CS_CONNECTED)
 			{
-				if ( svs.clients[i].netchan.remoteAddress.type != NA_BOT ) 
+				if ( svs.clients[i].netchan.remoteAddress.type != NA_BOT ||
+					svs.clients[i].demo.demorecording )
 				{
 					SV_SendClientMapChange( &svs.clients[i] ) ;
 				}
 			}
-		}	
+		}
 	}
 }
 
+extern void SV_SendClientGameState( client_t *client );
 /*
 ================
 SV_SpawnServer
@@ -443,12 +435,15 @@ void SV_SpawnServer( char *server, qboolean killBots, ForceReload_e eForceReload
 	char		systemInfo[16384];
 	const char	*p;
 
+	SV_StopAutoRecordDemos();
+
 	SV_SendMapChange();
 
-	re.RegisterMedia_LevelLoadBegin(server, eForceReload);
+	re->RegisterMedia_LevelLoadBegin(server, eForceReload);
 
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
+	svs.gameStarted = qfalse;
 
 	Com_Printf ("------ Server Initialization ------\n");
 	Com_Printf ("Server: %s\n",server);
@@ -456,7 +451,7 @@ void SV_SpawnServer( char *server, qboolean killBots, ForceReload_e eForceReload
 /*
 Ghoul2 Insert Start
 */
- 	// de allocate the snapshot entities 
+ 	// de allocate the snapshot entities
 	if (svs.snapshotEntities)
 	{
 		delete[] svs.snapshotEntities;
@@ -482,10 +477,10 @@ Ghoul2 Insert End
 	// clear the whole hunk because we're (re)loading the server
 	Hunk_Clear();
 
-	re.InitSkins();
-	re.InitShaders(qtrue);
+	re->InitSkins();
+	re->InitShaders(qtrue);
 
-	// init client structures and svs.numSnapshotEntities 
+	// init client structures and svs.numSnapshotEntities
 	if ( !Cvar_VariableValue("sv_running") ) {
 		SV_Startup();
 	} else {
@@ -500,7 +495,7 @@ Ghoul2 Insert End
 /*
 Ghoul2 Insert Start
 */
- 	// clear out those shaders, images and Models as long as this 
+ 	// clear out those shaders, images and Models as long as this
 	// isnt a dedicated server.
 	/*
 	if ( !com_dedicated->integer )
@@ -517,7 +512,7 @@ Ghoul2 Insert Start
 	*/
 	if (com_dedicated->integer)
 	{
-		re.SVModelInit();
+		re->SVModelInit();
 	}
 
 	SV_SendMapChange();
@@ -532,7 +527,7 @@ Ghoul2 Insert Start
 //	svs.snapshotEntities = (struct entityState_s *)Hunk_Alloc( sizeof(entityState_t)*svs.numSnapshotEntities, h_high );
 	svs.nextSnapshotEntities = 0;
 
-	// allocate the snapshot entities 
+	// allocate the snapshot entities
 	svs.snapshotEntities = new entityState_s[svs.numSnapshotEntities];
 	// we CAN afford to do this here, since we know the STL vectors in Ghoul2 are empty
 	memset(svs.snapshotEntities, 0, sizeof(entityState_t)*svs.numSnapshotEntities);
@@ -564,7 +559,7 @@ Ghoul2 Insert End
 	}
 
 	//rww - RAGDOLL_BEGIN
-	re.G2API_SetTime(sv.time,0);
+	re->G2API_SetTime(sv.time,0);
 	//rww - RAGDOLL_END
 
 	// make sure we are not paused
@@ -589,9 +584,11 @@ Ghoul2 Insert End
 	sv.restartedServerId = sv.serverId; // I suppose the init here is just to be safe
 	Cvar_Set( "sv_serverid", va("%i", sv.serverId ) );
 
+	time( &sv.realMapTimeStarted );
+
 	// clear physics interaction links
 	SV_ClearWorld ();
-	
+
 	// media configstring setting should be done during
 	// the loading stage, so connected clients don't have
 	// to load during actual gameplay
@@ -606,15 +603,15 @@ Ghoul2 Insert End
 	// run a few frames to allow everything to settle
 	for ( i = 0 ;i < 3 ; i++ ) {
 		//rww - RAGDOLL_BEGIN
-		re.G2API_SetTime(sv.time,0);
+		re->G2API_SetTime(sv.time,0);
 		//rww - RAGDOLL_END
-		VM_Call( gvm, GAME_RUN_FRAME, sv.time );
+		GVM_RunFrame( sv.time );
 		SV_BotFrame( sv.time );
 		sv.time += 100;
 		svs.time += 100;
 	}
 	//rww - RAGDOLL_BEGIN
-	re.G2API_SetTime(sv.time,0);
+	re->G2API_SetTime(sv.time,0);
 	//rww - RAGDOLL_END
 
 	// create a baseline for more efficient communications
@@ -637,7 +634,7 @@ Ghoul2 Insert End
 			}
 
 			// connect the client again
-			denied = (char *)VM_ExplicitArgPtr( gvm, VM_Call( gvm, GAME_CLIENT_CONNECT, i, qfalse, isBot ) );	// firstTime = qfalse
+			denied = GVM_ClientConnect( i, qfalse, isBot );	// firstTime = qfalse
 			if ( denied ) {
 				// this generally shouldn't happen, because the client
 				// was connected before the level change
@@ -661,19 +658,19 @@ Ghoul2 Insert End
 					client->deltaMessage = -1;
 					client->nextSnapshotTime = svs.time;	// generate a snapshot immediately
 
-					VM_Call( gvm, GAME_CLIENT_BEGIN, i );
+					GVM_ClientBegin( i, qfalse );
 				}
 			}
 		}
-	}	
+	}
 
 	// run another frame to allow things to look at all the players
-	VM_Call( gvm, GAME_RUN_FRAME, sv.time );
+	GVM_RunFrame( sv.time );
 	SV_BotFrame( sv.time );
 	sv.time += 100;
 	svs.time += 100;
 	//rww - RAGDOLL_BEGIN
-	re.G2API_SetTime(sv.time,0);
+	re->G2API_SetTime(sv.time,0);
 	//rww - RAGDOLL_END
 
 	if ( sv_pure->integer ) {
@@ -729,6 +726,16 @@ Ghoul2 Insert End
 		CL_StartHunkUsers();
 	}
 	*/
+
+	for ( client_t *client = svs.clients; client - svs.clients < sv_maxclients->integer; client++) {
+		// bots will not request gamestate, so it must be manually sent
+		// cannot do this above where it says it will because mapname is not set at that time
+		if ( client->netchan.remoteAddress.type == NA_BOT && client->demo.demorecording ) {
+			SV_SendClientGameState( client );
+		}
+	}
+
+	SV_BeginAutoRecordDemos();
 }
 
 
@@ -744,8 +751,8 @@ void SV_BotInitBotLib(void);
 #ifdef DEDICATED
 
 #define G2_VERT_SPACE_SERVER_SIZE 256
-CMiniHeap *G2VertSpaceServer = NULL;
-CMiniHeap CMiniHeap_singleton(G2_VERT_SPACE_SERVER_SIZE * 1024);
+IHeapAllocator *G2VertSpaceServer = NULL;
+CMiniHeap IHeapAllocator_singleton(G2_VERT_SPACE_SERVER_SIZE * 1024);
 
 
 /*
@@ -759,7 +766,7 @@ DLL glue
 void QDECL SV_RefPrintf( int print_level, const char *fmt, ...) {
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
-	
+
 	va_start (argptr,fmt);
 	Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
 	va_end (argptr);
@@ -789,21 +796,22 @@ static void CM_SetCachedMapDiskImage( void *ptr ) { gpvCachedMapDiskImage = ptr;
 static void CM_SetUsingCache( qboolean usingCache ) { gbUsingCachedMapDataRightNow = usingCache; }
 
 //server stuff D:
-extern vm_t *currentVM;
-extern vm_t *gvm;
-static vm_t *GetGameVM( void ) { return gvm; }
 extern void SV_GetConfigstring( int index, char *buffer, int bufferSize );
 extern void SV_SetConfigstring( int index, const char *val );
 
-static CMiniHeap *GetG2VertSpaceServer( void ) {
+static IHeapAllocator *GetG2VertSpaceServer( void ) {
 	return G2VertSpaceServer;
 }
 
+refexport_t	*re = NULL;
+
 static void SV_InitRef( void ) {
-	refimport_t	ri = {0};
-	refexport_t	*ret;
+	static refimport_t ri;
+	refexport_t *ret;
 
 	Com_Printf( "----- Initializing Renderer ----\n" );
+
+	memset( &ri, 0, sizeof( ri ) );
 
 	//set up the import table
 	ri.Printf = SV_RefPrintf;
@@ -856,7 +864,6 @@ static void SV_InitRef( void ) {
 	ri.CM_LeafCluster = CM_LeafCluster;
 	ri.CM_PointLeafnum = CM_PointLeafnum;
 	ri.CM_PointContents = CM_PointContents;
-	ri.VM_Call = VM_Call;
 	ri.Com_TheHunkMarkHasBeenMade = Com_TheHunkMarkHasBeenMade;
 	ri.SV_GetConfigstring = SV_GetConfigstring;
 	ri.SV_SetConfigstring = SV_SetConfigstring;
@@ -869,24 +876,22 @@ static void SV_InitRef( void ) {
 
 	// g2 data access
 	ri.GetSharedMemory = GetSharedMemory;
-//	ri.GetCgameVM = GetCgameVM;
-	ri.GetGameVM = GetGameVM;
+
+	// (c)g vm callbacks
 	ri.GetCurrentVM = GetCurrentVM;
+//	ri.CGVMLoaded = CGVMLoaded;
+//	ri.CGVM_RagCallback = CGVM_RagCallback;
 
 	// ugly win32 backend
 	ri.CM_GetCachedMapDiskImage = CM_GetCachedMapDiskImage;
 	ri.CM_SetCachedMapDiskImage = CM_SetCachedMapDiskImage;
 	ri.CM_SetUsingCache = CM_SetUsingCache;
 
-	//RAZFIXME: Might have to do something about this...
+	//FIXME: Might have to do something about this...
 	ri.GetG2VertSpaceServer = GetG2VertSpaceServer;
-	G2VertSpaceServer = &CMiniHeap_singleton;
+	G2VertSpaceServer = &IHeapAllocator_singleton;
 
 	ret = GetRefAPI( REF_API_VERSION, &ri );
-
-#if defined __USEA3D && defined __A3D_GEOM
-	hA3Dg_ExportRenderGeom (ret);
-#endif
 
 //	Com_Printf( "-------------------------------\n");
 
@@ -894,7 +899,7 @@ static void SV_InitRef( void ) {
 		Com_Error (ERR_FATAL, "Couldn't initialize refresh" );
 	}
 
-	re = *ret;
+	re = ret;
 }
 #endif
 
@@ -906,7 +911,7 @@ void SV_Init (void) {
 	Cvar_Get ("fraglimit", "20", CVAR_SERVERINFO);
 	Cvar_Get ("timelimit", "0", CVAR_SERVERINFO);
 	Cvar_Get ("capturelimit", "0", CVAR_SERVERINFO);
-	
+
 	// Get these to establish them and to make sure they have a default before the menus decide to stomp them.
 	Cvar_Get ("g_maxHolocronCarry", "3", CVAR_SERVERINFO);
 	Cvar_Get ("g_privateDuel", "1", CVAR_SERVERINFO );
@@ -922,6 +927,7 @@ void SV_Init (void) {
 	Cvar_Get ("protocol", va("%i", PROTOCOL_VERSION), CVAR_SERVERINFO | CVAR_ROM);
 	sv_mapname = Cvar_Get ("mapname", "nomap", CVAR_SERVERINFO | CVAR_ROM);
 	sv_privateClients = Cvar_Get ("sv_privateClients", "0", CVAR_SERVERINFO);
+	Cvar_CheckRange( sv_privateClients, 0, MAX_CLIENTS, qtrue );
 	sv_hostname = Cvar_Get ("sv_hostname", "*Jedi*", CVAR_SERVERINFO | CVAR_ARCHIVE );
 	sv_maxclients = Cvar_Get ("sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH);
 	sv_maxRate = Cvar_Get ("sv_maxRate", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
@@ -931,11 +937,7 @@ void SV_Init (void) {
 	// systeminfo
 	Cvar_Get ("sv_cheats", "1", CVAR_SYSTEMINFO | CVAR_ROM );
 	sv_serverid = Cvar_Get ("sv_serverid", "0", CVAR_SYSTEMINFO | CVAR_ROM );
-#ifndef DLL_ONLY // bk010216 - for DLL-only servers
-	sv_pure = Cvar_Get ("sv_pure", "1", CVAR_SYSTEMINFO );
-#else
-	sv_pure = Cvar_Get ("sv_pure", "0", CVAR_SYSTEMINFO | CVAR_INIT | CVAR_ROM );
-#endif
+	sv_pure = Cvar_Get ("sv_pure", "0", CVAR_SYSTEMINFO );
 	Cvar_Get ("sv_paks", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get ("sv_pakNames", "", CVAR_SYSTEMINFO | CVAR_ROM );
 	Cvar_Get ("sv_referencedPaks", "", CVAR_SYSTEMINFO | CVAR_ROM );
@@ -944,6 +946,8 @@ void SV_Init (void) {
 	// server vars
 	sv_rconPassword = Cvar_Get ("rconPassword", "", CVAR_TEMP );
 	sv_privatePassword = Cvar_Get ("sv_privatePassword", "", CVAR_TEMP );
+	sv_snapsMin = Cvar_Get ("sv_snapsMin", "10", CVAR_ARCHIVE ); // 1 <=> sv_snapsMax
+	sv_snapsMax = Cvar_Get ("sv_snapsMax", "40", CVAR_ARCHIVE ); // sv_snapsMin <=> sv_fps
 	sv_fps = Cvar_Get ("sv_fps", "40", CVAR_SERVERINFO );
 	sv_timeout = Cvar_Get ("sv_timeout", "200", CVAR_TEMP );
 	sv_zombietime = Cvar_Get ("sv_zombietime", "2", CVAR_TEMP );
@@ -962,7 +966,13 @@ void SV_Init (void) {
 	sv_mapChecksum = Cvar_Get ("sv_mapChecksum", "", CVAR_ROM);
 	sv_lanForceRate = Cvar_Get ("sv_lanForceRate", "1", CVAR_ARCHIVE );
 
+	sv_filterCommands = Cvar_Get( "sv_filterCommands", "0", CVAR_ARCHIVE );
+
 //	sv_debugserver = Cvar_Get ("sv_debugserver", "0", 0);
+
+	sv_autoDemo = Cvar_Get( "sv_autoDemo", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	sv_autoDemoBots = Cvar_Get( "sv_autoDemoBots", "0", CVAR_ARCHIVE );
+	sv_autoDemoMaxMaps = Cvar_Get( "sv_autoDemoMaxMaps", "0", CVAR_ARCHIVE );
 
 	// initialize bot cvars so they are listed and can be set before loading the botlib
 	SV_BotInitCvars();
@@ -991,7 +1001,7 @@ to totally exit after returning from this function.
 void SV_FinalMessage( char *message ) {
 	int			i, j;
 	client_t	*cl;
-	
+
 	// send it twice, ignoring rate
 	for ( j = 0 ; j < 2 ; j++ ) {
 		for (i=0, cl = svs.clients ; i < sv_maxclients->integer ; i++, cl++) {
@@ -1018,9 +1028,9 @@ Called when each game quits,
 before Sys_Quit or Sys_Error
 ================
 */
-void SV_Shutdown( char *finalmsg ) 
+void SV_Shutdown( char *finalmsg )
 {
-	if ( !com_sv_running || !com_sv_running->integer ) 
+	if ( !com_sv_running || !com_sv_running->integer )
 	{
 		return;
 	}
@@ -1034,10 +1044,11 @@ void SV_Shutdown( char *finalmsg )
 	SV_RemoveOperatorCommands();
 	SV_MasterShutdown();
 	SV_ShutdownGameProgs();
+	svs.gameStarted = qfalse;
 /*
 Ghoul2 Insert Start
 */
- 	// de allocate the snapshot entities 
+ 	// de allocate the snapshot entities
 	if (svs.snapshotEntities)
 	{
 		delete[] svs.snapshotEntities;

@@ -16,9 +16,6 @@ This file is part of Jedi Academy.
 */
 // Copyright 2001-2013 Raven Software
 
-// leave this line at the top for all g_xxxx.cpp files...
-#include "g_headers.h"
-
 //seems to be a compiler bug, it doesn't clean out the #ifdefs between dif-compiles
 //or something, so the headers spew errors on these defs from the previous compile.
 //this fixes that. -rww
@@ -108,6 +105,7 @@ extern void BG_SetAnim(playerState_t *ps, animation_t *animations, int setAnimPa
 extern int BG_GetTime(void);
 #endif
 
+#include "b_local.h"
 extern void BG_ExternThisSoICanRecompileInDebug( Vehicle_t *pVeh, playerState_t *riderPS );
 
 //this stuff has got to be predicted, so..
@@ -358,7 +356,7 @@ qboolean FighterSuspended( Vehicle_t *pVeh, playerState_t *parentPS )
 		return qtrue;
 	}
 	return qfalse;
-#elif CGAME
+#elif defined CGAME
 	return qfalse;
 #endif
 }
@@ -388,9 +386,9 @@ static void ProcessMoveCommands( Vehicle_t *pVeh )
 	qboolean isLandingOrLaunching = qfalse;
 #ifndef _JK2MP//SP
 	int curTime = level.time;
-#elif QAGAME//MP GAME
+#elif defined QAGAME//MP GAME
 	int curTime = level.time;
-#elif CGAME//MP CGAME
+#elif defined CGAME//MP CGAME
 	//FIXME: pass in ucmd?  Not sure if this is reliable...
 	int curTime = pm->cmd.serverTime;
 #endif
@@ -421,7 +419,7 @@ static void ProcessMoveCommands( Vehicle_t *pVeh )
 //a predicted event or only doing it game-side. -rich
 #ifdef QAGAME//MP GAME-side
 					//G_EntitySound( ((gentity_t *)(pVeh->m_pParentEntity)), CHAN_LOCAL, pVeh->m_pVehicleInfo->soundHyper );
-#elif CGAME//MP CGAME-side
+#elif defined CGAME//MP CGAME-side
 					trap_S_StartSound( NULL, pm->ps->clientNum, CHAN_LOCAL, pVeh->m_pVehicleInfo->soundHyper );
 #endif			
 				}
@@ -529,9 +527,9 @@ static void ProcessMoveCommands( Vehicle_t *pVeh )
 			{
 #ifndef _JK2MP//SP
 				G_SoundIndexOnEnt( pVeh->m_pParentEntity, CHAN_AUTO, pVeh->m_pVehicleInfo->soundTurbo );
-#elif QAGAME//MP GAME-side
+#elif defined QAGAME//MP GAME-side
 				G_EntitySound( ((gentity_t *)(pVeh->m_pParentEntity)), CHAN_AUTO, pVeh->m_pVehicleInfo->soundTurbo );
-#elif CGAME//MP CGAME-side
+#elif defined CGAME//MP CGAME-side
 				//trap_S_StartSound( NULL, pVeh->m_pParentEntity->s.number, CHAN_AUTO, pVeh->m_pVehicleInfo->soundTurbo );
 #endif		
 			}
@@ -1193,9 +1191,9 @@ static void ProcessOrientCommands( Vehicle_t *pVeh )
 	qboolean isLandingOrLanded = qfalse;
 #ifndef _JK2MP//SP
 	int curTime = level.time;
-#elif QAGAME//MP GAME
+#elif defined QAGAME//MP GAME
 	int curTime = level.time;
-#elif CGAME//MP CGAME
+#elif defined CGAME//MP CGAME
 	//FIXME: pass in ucmd?  Not sure if this is reliable...
 	int curTime = pm->cmd.serverTime;
 #endif
@@ -1577,9 +1575,9 @@ static void AnimateVehicle( Vehicle_t *pVeh )
 #endif
 #ifndef _JK2MP//SP
 	//nothing
-#elif QAGAME//MP GAME
+#elif defined QAGAME//MP GAME
 	int curTime = level.time;
-#elif CGAME//MP CGAME
+#elif defined CGAME//MP CGAME
 	//FIXME: pass in ucmd?  Not sure if this is reliable...
 	int curTime = pm->cmd.serverTime;
 #endif
@@ -1626,7 +1624,7 @@ static void AnimateVehicle( Vehicle_t *pVeh )
 					{//just landed?
 #ifdef QAGAME//MP GAME-side
 						G_EntitySound( ((gentity_t *)(pVeh->m_pParentEntity)), CHAN_AUTO, pVeh->m_pVehicleInfo->soundLand );
-#elif CGAME//MP CGAME-side
+#elif defined CGAME//MP CGAME-side
 						//trap_S_StartSound( NULL, pVeh->m_pParentEntity->s.number, CHAN_AUTO, pVeh->m_pVehicleInfo->soundLand );
 #endif
 					}

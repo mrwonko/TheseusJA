@@ -19,7 +19,7 @@ This file is part of Jedi Knight 2.
 #ifndef	__CG_LOCAL_H__
 #define	__CG_LOCAL_H__
 
-#include "../game/q_shared.h"
+#include "../../code/qcommon/q_shared.h"
 
 // define GAME_INCLUDE so that g_public.h does not define the
 // short, server-visible gclient_t and gentity_t structures,
@@ -583,6 +583,8 @@ extern	vmCvar_t		cg_drawGun;
 extern	vmCvar_t		cg_autoswitch;
 extern	vmCvar_t		cg_simpleItems;
 extern	vmCvar_t		cg_fov;
+extern	vmCvar_t		cg_fovViewmodel;
+extern	vmCvar_t		cg_fovViewmodelAdjust;
 extern	vmCvar_t		cg_missionstatusscreen;
 extern	vmCvar_t		cg_endcredits;
 extern	vmCvar_t		cg_updatedDataPadForcePower1;
@@ -738,7 +740,6 @@ void CG_GameText(int y );
 //
 void CG_DrawScrollText( void );
 void CG_DrawCaptionText( void );
-void CG_DrawGameText( void );
 void CG_DrawCenterString( void ); 
 
 

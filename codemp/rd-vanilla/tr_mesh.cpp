@@ -1,13 +1,6 @@
-//Anything above this #include will be ignored by the compiler
-#include "qcommon/exe_headers.h"
-
 // tr_mesh.c: triangle model functions
 
 #include "tr_local.h"
-
-#ifdef VV_LIGHTING
-#include "tr_lightmanager.h"
-#endif
 
 float ProjectRadius( float r, vec3_t location )
 {
@@ -28,12 +21,12 @@ float ProjectRadius( float r, vec3_t location )
 	p[1] = Q_fabs( r );
 	p[2] = -dist;
 
-	width = p[0] * tr.viewParms.projectionMatrix[1] + 
+	width = p[0] * tr.viewParms.projectionMatrix[1] +
 		           p[1] * tr.viewParms.projectionMatrix[5] +
 				   p[2] * tr.viewParms.projectionMatrix[9] +
 				   tr.viewParms.projectionMatrix[13];
 
-	depth = p[0] * tr.viewParms.projectionMatrix[3] + 
+	depth = p[0] * tr.viewParms.projectionMatrix[3] +
 		           p[1] * tr.viewParms.projectionMatrix[7] +
 				   p[2] * tr.viewParms.projectionMatrix[11] +
 				   tr.viewParms.projectionMatrix[15];
@@ -110,7 +103,7 @@ static int R_CullModel( md3Header_t *header, trRefEntity_t *ent ) {
 			}
 		}
 	}
-	
+
 	// calculate a bounding box in the current coordinate system
 	for (i = 0 ; i < 3 ; i++) {
 		bounds[0][i] = oldFrame->bounds[0][i] < newFrame->bounds[0][i] ? oldFrame->bounds[0][i] : newFrame->bounds[0][i];
@@ -209,7 +202,7 @@ int R_ComputeLOD( trRefEntity_t *ent ) {
 		}
 
 		flod *= tr.currentModel->numLods;
-		lod = myftol( flod );
+		lod = Q_ftol( flod );
 
 		if ( lod < 0 )
 		{
@@ -222,7 +215,7 @@ int R_ComputeLOD( trRefEntity_t *ent ) {
 	}
 
 	lod += r_lodbias->integer;
-	
+
 	if ( lod >= tr.currentModel->numLods )
 		lod = tr.currentModel->numLods - 1;
 	if ( lod < 0 )
@@ -299,11 +292,11 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	// when the surfaces are rendered, they don't need to be
 	// range checked again.
 	//
-	if ( (ent->e.frame >= tr.currentModel->md3[0]->numFrames) 
+	if ( (ent->e.frame >= tr.currentModel->md3[0]->numFrames)
 		|| (ent->e.frame < 0)
 		|| (ent->e.oldframe >= tr.currentModel->md3[0]->numFrames)
 		|| (ent->e.oldframe < 0) ) {
-			ri.Printf( PRINT_DEVELOPER, S_COLOR_RED "R_AddMD3Surfaces: no such frame %d to %d for '%s'\n",
+			ri->Printf( PRINT_DEVELOPER, S_COLOR_RED "R_AddMD3Surfaces: no such frame %d to %d for '%s'\n",
 				ent->e.oldframe, ent->e.frame,
 				tr.currentModel->name );
 			ent->e.frame = 0;
@@ -329,13 +322,8 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 	//
 	// set up lighting now that we know we aren't culled
 	//
-#ifdef VV_LIGHTING
-	if ( !personalModel ) {
-		VVLightMan.R_SetupEntityLighting( &tr.refdef, ent );
-#else
 	if ( !personalModel || r_shadows->integer > 1 ) {
 		R_SetupEntityLighting( &tr.refdef, ent );
-#endif
 	}
 
 	//
@@ -367,10 +355,10 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 				}
 			}
 			if (shader == tr.defaultShader) {
-				ri.Printf( PRINT_DEVELOPER, S_COLOR_RED "WARNING: no shader for surface %s in skin %s\n", surface->name, skin->name);
+				ri->Printf( PRINT_DEVELOPER, S_COLOR_RED "WARNING: no shader for surface %s in skin %s\n", surface->name, skin->name);
 			}
 			else if (shader->defaultShader) {
-				ri.Printf( PRINT_DEVELOPER, S_COLOR_RED "WARNING: shader %s in skin %s not found\n", shader->name, skin->name);
+				ri->Printf( PRINT_DEVELOPER, S_COLOR_RED "WARNING: shader %s in skin %s not found\n", shader->name, skin->name);
 			}
 		} else if ( surface->numShaders <= 0 ) {
 			shader = tr.defaultShader;
@@ -385,9 +373,9 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 
 		// stencil shadows can't do personal models unless I polyhedron clip
 		if ( !personalModel
-			&& r_shadows->integer == 2 
+			&& r_shadows->integer == 2
 			&& fogNum == 0
-			&& !(ent->e.renderfx & ( RF_NOSHADOW | RF_DEPTHHACK ) ) 
+			&& !(ent->e.renderfx & ( RF_NOSHADOW | RF_DEPTHHACK ) )
 			&& shader->sort == SS_OPAQUE ) {
 			R_AddDrawSurf( (surfaceType_t *)surface, tr.shadowShader, 0, qfalse );
 		}
@@ -402,12 +390,7 @@ void R_AddMD3Surfaces( trRefEntity_t *ent ) {
 
 		// don't add third_person objects if not viewing through a portal
 		if ( !personalModel ) {
-#ifdef VV_LIGHTING
-			int dlightBits = ( ent->dlightBits != 0 );
-			R_AddDrawSurf( (surfaceType_t *)surface, shader, fogNum, dlightBits );
-#else
 			R_AddDrawSurf( (surfaceType_t *)surface, shader, fogNum, qfalse );
-#endif
 		}
 
 		surface = (md3Surface_t *)( (byte *)surface + surface->ofsEnd );
