@@ -25,11 +25,12 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 // cg_syscalls.c -- this file is only included when building a dll
 #include "cg_local.h"
 
-static intptr_t (QDECL *Q_syscall)( intptr_t arg, ... ) = (intptr_t (QDECL *)( intptr_t, ...))-1;
-
 static void TranslateSyscalls( void );
 
-Q_EXPORT void dllEntry( intptr_t (QDECL *syscallptr)( intptr_t arg,... ) ) {
+typedef intptr_t( QDECL *SystemCallProc )( int, ... );
+static SystemCallProc Q_syscall = NULL;
+Q_EXPORT void dllEntry( SystemCallProc syscallptr )
+{
 	Q_syscall = syscallptr;
 
 	TranslateSyscalls();

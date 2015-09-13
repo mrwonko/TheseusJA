@@ -29,6 +29,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #include "snd_ambient.h"
 #include "FXExport.h"
 #include "FxUtil.h"
+#include "qcommon/syscall_helpers.h"
 
 extern IHeapAllocator *G2VertSpaceClient;
 extern botlib_export_t *botlib_export;
@@ -779,42 +780,64 @@ static void CGVM_Cmd_RemoveCommand( const char *cmd_name ) {
 
 // legacy syscall
 
-intptr_t CL_CgameSystemCalls( intptr_t *args ) {
-	switch ( args[0] ) {
+intptr_t CL_CgameSystemCalls( int command, ... ) {
+	va_list ap;
+	va_start( ap, command );
+	VarArgHelper va( ap );
+	switch ( command ) {
 		//rww - alright, DO NOT EVER add a GAME/CGAME/UI generic call without adding a trap to match, and
 		//all of these traps must be shared and have cases in sv_game, cl_cgame, and cl_ui. They must also
 		//all be in the same order, and start at 100.
 	case TRAP_MEMSET:
-		Com_Memset( VMA(1), args[2], args[3] );
+	{
+		// can't use va_arg calls as parameters because evaluation order is not guaranteed
+		auto args = va.args< void*, int, int >();
+		Com_Memset( std::get< 0 >( args ), std::get< 1 >( args ), std::get< 2 >( args ) );
 		return 0;
+	}
 
 	case TRAP_MEMCPY:
-		Com_Memcpy( VMA(1), VMA(2), args[3] );
+	{
+		auto args = va.args< void*, const void*, int >();
+		Com_Memcpy( std::get< 0 >( args ), std::get< 1 >( args ), std::get< 2 >( args ) );
 		return 0;
+	}
 
 	case TRAP_STRNCPY:
-		strncpy( (char *)VMA(1), (const char *)VMA(2), args[3] );
-		return args[1];
+	{
+		auto args = va.args< char*, const char*, int >();
+		return (intptr_t )strncpy( std::get< 0 >( args ), std::get< 1 >( args ), std::get< 2 >( args ) );
+	}
 
 	case TRAP_SIN:
-		return FloatAsInt( sin( VMF(1) ) );
+		return FloatAsInt( sin( _vmf( va_arg( ap, int ) ) ) );
 
 	case TRAP_COS:
-		return FloatAsInt( cos( VMF(1) ) );
+		return FloatAsInt( cos( _vmf( va_arg( ap, int ) ) ) );
 
 	case TRAP_ATAN2:
-		return FloatAsInt( atan2( VMF(1), VMF(2) ) );
+	{
+		float arg1 = _vmf( va_arg( ap, int ) );
+		float arg2 = _vmf( va_arg( ap, int ) );
+		return FloatAsInt( atan2( arg1, arg2 ) );
+	}
 
 	case TRAP_SQRT:
-		return FloatAsInt( sqrt( VMF(1) ) );
+		return FloatAsInt( sqrt( _vmf( va_arg( ap, int ) ) ) );
 
 	case TRAP_MATRIXMULTIPLY:
-		MatrixMultiply( (vec3_t *)VMA(1), (vec3_t *)VMA(2), (vec3_t *)VMA(3) );
+	{
+		auto args = va.args< vec3_t*, vec3_t*, vec3_t* >();
+		MatrixMultiply( std::get< 0 >( args ), std::get< 1 >( args ), std::get< 2 >( args ) );
 		return 0;
+	}
 
 	case TRAP_ANGLEVECTORS:
-		AngleVectors( (const float *)VMA(1), (float *)VMA(2), (float *)VMA(3), (float *)VMA(4) );
+	{
+		auto args = va.args< const float*, float*, float*, float* >();
+		AngleVectors( std::get< 0 >( args ), std::get< 1 >( args ), std::get< 2 >( args ), std::get< 3 >( args ) );
 		return 0;
+	}
 
 	case TRAP_PERPENDICULARVECTOR:
 		PerpendicularVector( (float *)VMA(1), (const float *)VMA(2) );

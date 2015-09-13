@@ -282,7 +282,7 @@ typedef struct vm_s {
 	// legacy stuff
 	struct {
 		intptr_t	(QDECL *main)( int callNum, ... );		// module vmMain
-		intptr_t	(QDECL *syscall)( intptr_t *parms );	// engine syscall handler
+		SystemCallProc	*syscall;	// engine syscall handler
 	} legacy;
 } vm_t;
 
@@ -321,7 +321,7 @@ typedef enum {
 } sharedTraps_t;
 
 void			VM_Init( void );
-vm_t			*VM_CreateLegacy( vmSlots_t vmSlot, intptr_t (*systemCalls)(intptr_t *) );
+vm_t			*VM_CreateLegacy( vmSlots_t vmSlot, SystemCallProc *systemCalls );
 vm_t			*VM_Create( vmSlots_t vmSlot );
 void			 VM_Free( vm_t *vm );
 void			 VM_Clear(void);
@@ -331,7 +331,7 @@ void			 VM_Shifted_Alloc( void **ptr, int size );
 void			 VM_Shifted_Free( void **ptr );
 void			*VM_ArgPtr( intptr_t intValue );
 void			*VM_ExplicitArgPtr( vm_t *vm, intptr_t intValue );
-float			_vmf( intptr_t x );
+float			_vmf( int32_t x );
 
 #define	VMA(x) VM_ArgPtr( args[x] )
 #define	VMF(x) _vmf( args[x] )

@@ -64,40 +64,6 @@ void VM_Init( void ) {
 	memset( vmTable, 0, sizeof(vmTable) );
 }
 
-// The syscall mechanism relies on stack manipulation to get it's args.
-// This is likely due to C's inability to pass "..." parameters to a function in one clean chunk.
-// On PowerPC Linux, these parameters are not necessarily passed on the stack, so while (&arg[0] == arg) is true,
-//	(&arg[1] == 2nd function parameter) is not necessarily accurate, as arg's value might have been stored to the stack
-//	or other piece of scratch memory to give it a valid address, but the next parameter might still be sitting in a
-//	register.
-// QVM's syscall system also assumes that the stack grows downward, and that any needed types can be squeezed, safely,
-//	into a signed int.
-// This hack below copies all needed values for an argument to an array in memory, so that QVM can get the correct values.
-// This can also be used on systems where the stack grows upwards, as the presumably standard and safe stdargs.h macros
-//	are used.
-// The original code, while probably still inherently dangerous, seems to work well enough for the platforms it already
-//	works on. Rather than add the performance hit for those platforms, the original code is still in use there.
-// For speed, we just grab 15 arguments, and don't worry about exactly how many the syscall actually needs; the extra is
-//	thrown away.
-intptr_t QDECL VM_DllSyscall( intptr_t arg, ... ) {
-#if !id386 || defined __clang__ || defined MACOS_X
-	// rcg010206 - see commentary above
-	intptr_t args[16];
-	va_list ap;
-
-	args[0] = arg;
-
-	va_start( ap, arg );
-	for (size_t i = 1; i < ARRAY_LEN (args); i++)
-		args[i] = va_arg( ap, intptr_t );
-	va_end( ap );
-
-	return currentVM->legacy.syscall( args );
-#else // original id code
-	return currentVM->legacy.syscall( &arg );
-#endif
-}
-
 // Reload the data, but leave everything else in place
 // This allows a server to do a map_restart without changing memory allocation
 vm_t *VM_Restart( vm_t *vm ) {
@@ -111,7 +77,7 @@ vm_t *VM_Restart( vm_t *vm ) {
 		return VM_Create( saved.slot );
 }
 
-vm_t *VM_CreateLegacy( vmSlots_t vmSlot, intptr_t( *systemCalls )(intptr_t *) ) {
+vm_t *VM_CreateLegacy( vmSlots_t vmSlot, SystemCallProc *systemCalls ) {
 	vm_t *vm = NULL;
 
 	if ( !systemCalls ) {
@@ -135,7 +101,7 @@ vm_t *VM_CreateLegacy( vmSlots_t vmSlot, intptr_t( *systemCalls )(intptr_t *) ) 
 
 	// find the legacy syscall api
 	FS_FindPureDLL( vm->name );
-	vm->dllHandle = Sys_LoadLegacyGameDll( vm->name, &vm->legacy.main, VM_DllSyscall );
+	vm->dllHandle = Sys_LoadLegacyGameDll( vm->name, &vm->legacy.main, systemCalls );
 
 	Com_Printf( "VM_CreateLegacy: %s" ARCH_STRING DLL_EXT, vm->name );
 	if ( vm->dllHandle ) {
@@ -275,7 +241,7 @@ void *VM_ExplicitArgPtr( vm_t *vm, intptr_t intValue ) {
 	return (void *)intValue;
 }
 
-float _vmf( intptr_t x ) {
+float _vmf( int32_t x ) {
 	byteAlias_t fi;
 	fi.i = (int)x;
 	return fi.f;
