@@ -23,6 +23,10 @@ endif(NOT InOpenJK)
 
 set(TestFiles
 	"main.cpp"
+
+	"md4.cpp"
+	"${SPDir}/qcommon/md4.cpp"
+
 	"safe/string.cpp"
 	"safe/limited_vector.cpp"
 	"${SharedDir}/qcommon/safe/string.cpp"
@@ -36,6 +40,7 @@ endif()
 source_group( "tests" REGULAR_EXPRESSION ".*")
 source_group( "tests\\safe" REGULAR_EXPRESSION "safe/.*" )
 source_group( "qcommon\\safe" REGULAR_EXPRESSION "${SharedDir}/qcommon/safe/.*" )
+source_group( "code\\qcommon" REGULAR_EXPRESSION "${SPDir}/qcommon/.*" )
 
 if(MSVC)
 	set( Boost_USE_STATIC_LIBS ON )

@@ -31,6 +31,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "md4.h"
 
 #ifndef FINAL_BUILD
 #include "../client/client.h"
@@ -1940,7 +1941,7 @@ static pack_t *FS_LoadZipFile( const char *zipfile, const char *basename )
 		unzGoToNextFile(uf);
 	}
 
-	pack->checksum = Com_BlockChecksum( fs_headerLongs, sizeof(*fs_headerLongs) * fs_numHeaderLongs );
+	pack->checksum = Com::BlockChecksum( { reinterpret_cast< const byte* >( fs_headerLongs ), reinterpret_cast< const byte* >( fs_headerLongs ) + sizeof( *fs_headerLongs ) * fs_numHeaderLongs } );
 	pack->checksum = LittleLong( pack->checksum );
 
 	Z_Free(fs_headerLongs);

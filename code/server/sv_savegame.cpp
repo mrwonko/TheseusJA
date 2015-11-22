@@ -34,6 +34,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #include "../game/statindex.h"
 #include "../game/weapons.h"
 #include "../game/g_items.h"
+#include "../qcommon/md4.h"
 
 #include <map>
 
@@ -1342,7 +1343,7 @@ qboolean SG_Append( const std::uint32_t chid, const void *pvData, const std::int
 		return qtrue;
 	}
 
-	const std::uint32_t uiCksum = Com_BlockChecksum( pvData, iLength );
+	const std::uint32_t uiCksum = Com::BlockChecksum( { reinterpret_cast< const byte* >( pvData ), reinterpret_cast< const byte* >( pvData ) + iLength } );
 
 	unsigned int uiSaved = SG_Write( &chid, sizeof( chid ), fhSaveGame );
 
@@ -1537,7 +1538,7 @@ static int SG_Read_Actual(unsigned int chid, void *pvAddress, int iLength, void 
 
 	// Make sure the checksums match...
 	//
-	uiCksum = Com_BlockChecksum( pvAddress, iLength );
+	uiCksum = Com::BlockChecksum( { reinterpret_cast< const byte* >( pvAddress ), reinterpret_cast< const byte* >( pvAddress ) + iLength } );
 	if ( uiLoadedCksum != uiCksum)
 	{
 		if (!qbSGReadIsTestOnly)

@@ -27,14 +27,32 @@ Boston, MA  02111-1307, USA
 $Id: mdfour.c,v 1.1 2002/08/23 22:03:27 abster Exp $
 */
 
-#include "q_shared.h"
-#include "qcommon.h"
+#include "md4.h"
 
-typedef struct mdfour_s
+#include <array>
+#include <cassert>
+#include <algorithm>
+#include <functional>
+
+using uint128 = std::array< std::uint32_t, 4 >;
+using uint512 = std::array< std::uint32_t, 16 >;
+
+static uint128& operator+=( uint128& lhs, const uint128& rhs )
 {
-	uint32_t A, B, C, D;
-	uint32_t totalN;
-} mdfour_ctx;
+	std::transform( lhs.begin(), lhs.end(), rhs.begin(), lhs.begin(), std::plus< std::uint32_t >() );
+	return lhs;
+}
+
+struct mdfour_context
+{
+	uint128 value = { {
+		0x67452301,
+		0xefcdab89,
+		0x98badcfe,
+		0x10325476
+	} };
+	uint64_t numBytes = 0;
+};
 
 
 /* NOTE: This code makes no attempt to be fast!
@@ -42,30 +60,23 @@ typedef struct mdfour_s
 It assumes that an int is at least 32 bits long
 */
 
-static  mdfour_ctx *m;
-
 #define F(X,Y,Z) (((X)&(Y)) | ((~(X))&(Z)))
 #define G(X,Y,Z) (((X)&(Y)) | ((X)&(Z)) | ((Y)&(Z)))
 #define H(X,Y,Z) ((X)^(Y)^(Z))
 #define lshift(x,s) (((x)<<(s)) | ((x)>>(32-(s))))
 
-#define ROUND1(a,b,c,d,k,s) a = lshift(a + F(b,c,d) + X[k], s)
-#define ROUND2(a,b,c,d,k,s) a = lshift(a + G(b,c,d) + X[k] + 0x5A827999,s)
-#define ROUND3(a,b,c,d,k,s) a = lshift(a + H(b,c,d) + X[k] + 0x6ED9EBA1,s)
+#define ROUND1(a,b,c,d,k,s) a = lshift(a + F(b,c,d) + input[k], s)
+#define ROUND2(a,b,c,d,k,s) a = lshift(a + G(b,c,d) + input[k] + 0x5A827999,s)
+#define ROUND3(a,b,c,d,k,s) a = lshift(a + H(b,c,d) + input[k] + 0x6ED9EBA1,s)
 
 /* this applies md4 to 64 byte chunks */
-static void mdfour64( uint32_t *M )
+static void mdfour64( const uint512& input, mdfour_context& ctx )
 {
-	int j;
-	uint32_t AA, BB, CC, DD;
-	uint32_t X[16];
-	uint32_t A, B, C, D;
-
-	for ( j = 0; j<16; j++ )
-		X[j] = M[j];
-
-	A = m->A; B = m->B; C = m->C; D = m->D;
-	AA = A; BB = B; CC = C; DD = D;
+	uint128 value = ctx.value;
+	uint32_t& A = value[ 0 ];
+	uint32_t& B = value[ 1 ];
+	uint32_t& C = value[ 2 ];
+	uint32_t& D = value[ 3 ];
 
 	ROUND1( A, B, C, D, 0, 3 );  ROUND1( D, A, B, C, 1, 7 );
 	ROUND1( C, D, A, B, 2, 11 );  ROUND1( B, C, D, A, 3, 19 );
@@ -94,120 +105,91 @@ static void mdfour64( uint32_t *M )
 	ROUND3( A, B, C, D, 3, 3 );  ROUND3( D, A, B, C, 11, 9 );
 	ROUND3( C, D, A, B, 7, 11 );  ROUND3( B, C, D, A, 15, 15 );
 
-	A += AA; B += BB; C += CC; D += DD;
-
-	for ( j = 0; j<16; j++ )
-		X[j] = 0;
-
-	m->A = A; m->B = B; m->C = C; m->D = D;
+	ctx.value += value;
 }
 
-static void copy64( uint32_t *M, byte *in )
+static uint512 copy64( const gsl::array_view< const byte >& input )
 {
-	int i;
-
-	for ( i = 0; i<16; i++ )
-		M[i] = (in[i * 4 + 3] << 24) | (in[i * 4 + 2] << 16) |
-		(in[i * 4 + 1] << 8) | (in[i * 4 + 0] << 0);
-}
-
-static void copy4( byte *out, uint32_t x )
-{
-	out[0] = x & 0xFF;
-	out[1] = (x >> 8) & 0xFF;
-	out[2] = (x >> 16) & 0xFF;
-	out[3] = (x >> 24) & 0xFF;
-}
-
-void mdfour_begin( mdfour_ctx *md )
-{
-	md->A = 0x67452301;
-	md->B = 0xefcdab89;
-	md->C = 0x98badcfe;
-	md->D = 0x10325476;
-	md->totalN = 0;
-}
-
-
-static void mdfour_tail( byte *in, int n )
-{
-	byte buf[128];
-	uint32_t M[16];
-	uint32_t b;
-
-	m->totalN += n;
-
-	b = m->totalN * 8;
-
-	Com_Memset( buf, 0, 128 );
-	if ( n ) Com_Memcpy( buf, in, n );
-	buf[n] = 0x80;
-
-	if ( n <= 55 )
+	assert( input.size() >= 64 );
+	uint512 result;
+	auto it = input.begin();
+	for( uint32_t& val : result )
 	{
-		copy4( buf + 56, b );
-		copy64( M, buf );
-		mdfour64( M );
+		val = 0;
+		for( unsigned int i = 0; i < 4; ++i )
+		{
+			val |= ( *it++ ) << ( i * 8 );
+		}
 	}
-	else
+	return result;
+}
+
+static void copy8( gsl::array_view< byte > out, const uint64_t x )
+{
+	assert( out.size() >= 8 );
+	for( unsigned int i = 0; i < 8; ++i )
 	{
-		copy4( buf + 120, b );
-		copy64( M, buf );
-		mdfour64( M );
-		copy64( M, buf + 64 );
-		mdfour64( M );
+		out[ i ] = ( x >> ( 8 * i ) ) & 0xFF;
 	}
 }
 
-static void mdfour_update( mdfour_ctx *md, byte *in, int n )
+static void mdfour_tail( const gsl::array_view< const byte >& input, mdfour_context& ctx )
 {
-	uint32_t M[16];
+	assert( input.size() < 64 );
 
-	m = md;
+	ctx.numBytes += input.size();
+	std::uint64_t numBits = ctx.numBytes * 8;
 
-	if ( n == 0 ) mdfour_tail( in, n );
+	std::array< byte, 64 > buf{}; // 0-initialized
+	std::copy( input.begin(), input.end(), buf.begin() );
+	
+	// add a 1 bit, then fill with 0 bits until there are 64 bit remaining (for bit count)
+	buf[ input.size() ] = 0x80;
 
-	while ( n >= 64 )
+	// does the bit count still fit in this 512 bit block?
+	const bool needExtraBlock = input.size() + 1 + 8 > 64;
+
+	if( !needExtraBlock )
 	{
-		copy64( M, in );
-		mdfour64( M );
-		in += 64;
-		n -= 64;
-		m->totalN += 64;
+		copy8( { buf.data() + ( buf.size() - 8 ), buf.data() + buf.size() }, numBits );
+	}
+	uint512 data = copy64( buf );
+	mdfour64( data, ctx );
+	if( needExtraBlock )
+	{
+		data = {};
+		data[ 14 ] = numBits & 0xFFFFFFFF;
+		data[ 15 ] = ( numBits >> 32 ) & 0xFFFFFFFF;
+		mdfour64( data, ctx );
+	}
+}
+
+static uint128 mdfour( gsl::array_view< const byte > input )
+{
+	mdfour_context ctx;
+	
+	if( input.size() == 0 )
+	{
+		// this happens twice for size 0; but can't change that or savegame compat might break.
+		mdfour_tail( input, ctx );
 	}
 
-	mdfour_tail( in, n );
-}
-
-
-static void mdfour_result( mdfour_ctx *md, byte *out )
-{
-	m = md;
-
-	copy4( out, m->A );
-	copy4( out + 4, m->B );
-	copy4( out + 8, m->C );
-	copy4( out + 12, m->D );
-}
-
-static void mdfour( byte *out, byte *in, int n )
-{
-	mdfour_ctx md;
-	mdfour_begin( &md );
-	mdfour_update( &md, in, n );
-	mdfour_result( &md, out );
+	while( input.size() >= 64 )
+	{
+		uint512 data = copy64( input );
+		mdfour64( data, ctx );
+		ctx.numBytes += 64;
+		input = { input.begin() + 64, input.end() };
+	}
+	mdfour_tail( input, ctx );
+	return ctx.value;
 }
 
 //===================================================================
 
-unsigned Com_BlockChecksum( const void *buffer, int length )
+std::uint32_t Com::BlockChecksum( const gsl::array_view< const byte >& buffer )
 {
-	int				digest[4];
-	unsigned	val;
+	uint128 digest = mdfour( buffer );
 
-	mdfour( (byte *)digest, (byte *)buffer, length );
-
-	val = digest[0] ^ digest[1] ^ digest[2] ^ digest[3];
-
-	return val;
+	return digest[0] ^ digest[1] ^ digest[2] ^ digest[3];
 }

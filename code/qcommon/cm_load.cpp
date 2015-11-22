@@ -24,6 +24,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 // cmodel.c -- model loading
 
 #include "cm_local.h"
+#include "qcommon/md4.h"
 
 #ifdef BSPC
 void SetPlaneSignbits (cplane_t *out) {
@@ -752,7 +753,7 @@ static void CM_LoadMap_Actual( const char *name, qboolean clientload, int *check
 
 		// carry on as before...
 
-		last_checksum = LittleLong (Com_BlockChecksum (buf, iBSPLen));
+		last_checksum = LittleLong( Com::BlockChecksum( { reinterpret_cast< const byte* >( buf ), reinterpret_cast< const byte* >( buf ) + iBSPLen } ) );
 
 		header = *(dheader_t *)buf;
 		for (i=0 ; i<sizeof(dheader_t)/4 ; i++) {
