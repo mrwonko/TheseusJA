@@ -181,7 +181,7 @@ typedef struct {
 
 	// Savegame handling
 	//
-	qboolean	(*AppendToSaveGame)(unsigned int chid, const void *data, int length);
+	qboolean	(*AppendToSaveGame)(const std::uint32_t chid, const void *data, const std::int32_t length);
 
 	int			(*ReadFromSaveGame)(unsigned int chid, void *pvAddress, int iLength, void **ppvAddressPtr );
 	int			(*ReadFromSaveGameOptional)(unsigned int chid, void *pvAddress, int iLength, void **ppvAddressPtr );

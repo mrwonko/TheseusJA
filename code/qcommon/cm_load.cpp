@@ -1210,7 +1210,7 @@ Writes the portal state to a savegame file
 ===================
 */
 //
-qboolean SG_Append(unsigned int chid, const void *data, int length);
+qboolean SG_Append( const std::uint32_t chid, const void *pvData, const std::int32_t iLength );
 int SG_Read(unsigned int chid, void *pvAddress, int iLength, void **ppvAddressPtr = NULL);
 
 void CM_WritePortalState ()

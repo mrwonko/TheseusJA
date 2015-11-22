@@ -1286,7 +1286,7 @@ static byte *CompressMem_AllocScratchBuffer(int iSize)
 
 // returns -1 for compression-not-worth-it, else compressed length...
 //
-int CompressMem(byte *pbData, int iLength, byte *&pbOut)
+int CompressMem(const byte *pbData, int iLength, byte *&pbOut)
 {
 	if (!sv_compress_saved_games->integer)
 		return -1;
@@ -1320,89 +1320,87 @@ int SG_Write(const void * chid, const int bytesize, fileHandle_t fhSaveGame)
 
 
 
-qboolean SG_Append(unsigned int chid, const void *pvData, int iLength)
+qboolean SG_Append( const std::uint32_t chid, const void *pvData, const std::int32_t iLength )
 {
-	unsigned int	uiCksum;
-	unsigned int	uiSaved;
-
 #ifdef _DEBUG
-	int				i;
-	unsigned int	*pTest;
-
-	pTest = (unsigned int *) pvData;
-	for (i=0; i<iLength/4; i++, pTest++)
 	{
-		assert(*pTest != 0xfeeefeee);
-		assert(*pTest != 0xcdcdcdcd);
-		assert(*pTest != 0xdddddddd);
+		const unsigned long *pTest = reinterpret_cast< const unsigned long * >( pvData );
+		for( int i = 0; i < iLength / 4; i++, pTest++ )
+		{
+			assert( *pTest != 0xfeeefeee ); // Used by Microsoft's HeapFree() to mark freed heap memory
+			assert( *pTest != 0xcdcdcdcd ); // Used by Microsoft's C++ debugging runtime library to mark uninitialised heap memory
+			assert( *pTest != 0xdddddddd ); // free()
+		}
 	}
 #endif
 
 	Com_DPrintf("Attempting write of chunk %s length %d\n", SG_GetChidText(chid), iLength);
 
 	// only write data out if we're not in test mode....
-	//
-	if (!sv_testsave->integer)
+	if( sv_testsave->integer )
 	{
-		uiCksum = Com_BlockChecksum (pvData, iLength);
-
-		uiSaved  = SG_Write(&chid,		sizeof(chid),		fhSaveGame);
-
-		byte *pbCompressedData = NULL;
-		int iCompressedLength = CompressMem((byte*)pvData, iLength, pbCompressedData);
-		if (iCompressedLength != -1)
-		{
-			// compressed...  (write length field out as -ve)
-			//
-			iLength = -iLength;
-			uiSaved += SG_Write(&iLength,			sizeof(iLength),			fhSaveGame);
-			iLength = -iLength;
-			//
-			// [compressed length]
-			//
-			uiSaved += SG_Write(&iCompressedLength, sizeof(iCompressedLength),	fhSaveGame);
-			//
-			// compressed data...
-			//
-			uiSaved += SG_Write(pbCompressedData,	iCompressedLength,			fhSaveGame);
-			//
-			// CRC...
-			//
-			uiSaved += SG_Write(&uiCksum,			sizeof(uiCksum),			fhSaveGame);
-
-			if (uiSaved != sizeof(chid) + sizeof(iLength) + sizeof(uiCksum) + sizeof(iCompressedLength) + iCompressedLength)
-			{
-				Com_Printf(S_COLOR_RED "Failed to write %s chunk\n", SG_GetChidText(chid));
-				gbSGWriteFailed = qtrue;
-				return qfalse;
-			}
-		}
-		else
-		{
-			// uncompressed...
-			//
-			uiSaved += SG_Write(&iLength,	sizeof(iLength),	fhSaveGame);
-			//
-			// uncompressed data...
-			//
-			uiSaved += SG_Write( pvData,	iLength,			fhSaveGame);
-			//
-			// CRC...
-			//
-			uiSaved += SG_Write(&uiCksum,	sizeof(uiCksum),	fhSaveGame);
-
-			if (uiSaved != sizeof(chid) + sizeof(iLength) + sizeof(uiCksum) + iLength)
-			{
-				Com_Printf(S_COLOR_RED "Failed to write %s chunk\n", SG_GetChidText(chid));
-				gbSGWriteFailed = qtrue;
-				return qfalse;
-			}
-		}
-
-		#ifdef SG_PROFILE
-		save_info[chid].Add(iLength);
-		#endif
+		return qtrue;
 	}
+
+	const std::uint32_t uiCksum = Com_BlockChecksum( pvData, iLength );
+
+	unsigned int uiSaved = SG_Write( &chid, sizeof( chid ), fhSaveGame );
+
+	byte *pbCompressedData = NULL;
+	const std::uint32_t iCompressedLength = CompressMem(reinterpret_cast< const byte* >( pvData ), iLength, pbCompressedData);
+	if (iCompressedLength != -1)
+	{
+		// compressed...  (write length field out as -ve)
+		//
+		{
+			const std::int32_t invLength = -iLength;
+			uiSaved += SG_Write( &invLength, sizeof( invLength ), fhSaveGame );
+		}
+		//
+		// [compressed length]
+		//
+		uiSaved += SG_Write(&iCompressedLength, sizeof(iCompressedLength),	fhSaveGame);
+		//
+		// compressed data...
+		//
+		uiSaved += SG_Write(pbCompressedData,	iCompressedLength,			fhSaveGame);
+		//
+		// CRC...
+		//
+		uiSaved += SG_Write(&uiCksum,			sizeof(uiCksum),			fhSaveGame);
+
+		if (uiSaved != sizeof(chid) + sizeof(iLength) + sizeof(uiCksum) + sizeof(iCompressedLength) + iCompressedLength)
+		{
+			Com_Printf(S_COLOR_RED "Failed to write %s chunk\n", SG_GetChidText(chid));
+			gbSGWriteFailed = qtrue;
+			return qfalse;
+		}
+	}
+	else
+	{
+		// uncompressed...
+		//
+		uiSaved += SG_Write(&iLength,	sizeof(iLength),	fhSaveGame);
+		//
+		// uncompressed data...
+		//
+		uiSaved += SG_Write( pvData,	iLength,			fhSaveGame);
+		//
+		// CRC...
+		//
+		uiSaved += SG_Write(&uiCksum,	sizeof(uiCksum),	fhSaveGame);
+
+		if (uiSaved != sizeof(chid) + sizeof(iLength) + sizeof(uiCksum) + iLength)
+		{
+			Com_Printf(S_COLOR_RED "Failed to write %s chunk\n", SG_GetChidText(chid));
+			gbSGWriteFailed = qtrue;
+			return qfalse;
+		}
+	}
+
+	#ifdef SG_PROFILE
+	save_info[chid].Add(iLength);
+	#endif
 
 	return qtrue;
 }

@@ -112,7 +112,7 @@ typedef struct {
 															const int passEntityNum, const int contentmask,
 															const EG2_Collision eG2TraceType, const int useLod );
 
-	qboolean			(*SG_Append)						( unsigned int chid, const void *pvData, int iLength );
+	qboolean			(*SG_Append)						( const std::uint32_t chid, const void *pvData, const std::int32_t iLength );
 
 	int					(*SV_PointContents)					( const vec3_t p, clipHandle_t model );
 
