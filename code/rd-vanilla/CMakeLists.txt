@@ -78,6 +78,7 @@ if(BuildSPRdVanilla OR BuildJK2SPRdVanilla)
 		"${SPDir}/qcommon/q_math.cpp"
 		"${SPDir}/qcommon/q_shared.cpp"
 		"${SPDir}/qcommon/q_shared.h"
+		"${SPDir}/qcommon/q_int.h"
 		
 		${SharedCommonFiles}
 		)
