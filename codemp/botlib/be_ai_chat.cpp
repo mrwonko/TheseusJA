@@ -49,6 +49,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #include "be_interface.h"
 #include "be_ea.h"
 #include "be_ai_chat.h"
+#include <algorithm>
 
 
 //escape character
@@ -479,31 +480,30 @@ void UnifyWhiteSpaces(char *string)
 // Returns:					-
 // Changes Globals:		-
 //===========================================================================
-int StringContains(char *str1, char *str2, int casesensitive)
+int StringContains(const char *str1, const char *str2, int casesensitive)
 {
-	int len, i, j, index;
-
-	if (str1 == NULL || str2 == NULL) return -1;
-
-	len = strlen(str1) - strlen(str2);
-	index = 0;
-	for (i = 0; i <= len; i++, str1++, index++)
-	{
-		for (j = 0; str2[j]; j++)
-		{
-			if (casesensitive)
-			{
-				if (str1[j] != str2[j]) break;
-			} //end if
-			else
-			{
-				if (toupper(str1[j]) != toupper(str2[j])) break;
-			} //end else
-		} //end for
-		if (!str2[j]) return index;
-	} //end for
-	return -1;
+	const gsl::cstring_view view1{ str1, str1 + strlen( str1 ) };
+	const gsl::cstring_view view2{ str2, str2 + strlen( str2 ) };
+	auto pos = StringContains( view1, view2, casesensitive != 0 );
+	return pos == view1.end() ? -1 : pos - view1.begin();
 } //end of the function StringContains
+
+gsl::cstring_view::iterator StringContains( const gsl::cstring_view haystack, const gsl::cstring_view needle, bool caseSensitive )
+{
+	if( caseSensitive )
+	{
+		return std::search(
+			haystack.begin(), haystack.end(),
+			needle.begin(), needle.end() );
+	}
+	else
+	{
+		return std::search(
+			haystack.begin(), haystack.end(),
+			needle.begin(), needle.end(),
+			[]( const char lhs, const char rhs ) { return toupper( lhs ) == toupper( rhs ); } );
+	}
+}
 //===========================================================================
 //
 // Parameter:				-

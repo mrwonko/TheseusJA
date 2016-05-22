@@ -36,6 +36,8 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "gsl/gsl-lite.h"
+
 #define MAX_MESSAGE_SIZE		256
 #define MAX_CHATTYPE_NAME		32
 #define MAX_MATCHVARIABLES		8
@@ -102,7 +104,9 @@ void BotEnterChat(int chatstate, int clientto, int sendto);
 //get the chat message ready to be output
 void BotGetChatMessage(int chatstate, char *buf, int size);
 //checks if the first string contains the second one, returns index into first string or -1 if not found
-int StringContains(char *str1, char *str2, int casesensitive);
+int StringContains(const char *str1, const char *str2, int casesensitive);
+//checks if the first string contains the second one, returns iterator into first string (end if not found)
+gsl::cstring_view::iterator StringContains( const gsl::cstring_view haystack, const gsl::cstring_view needle, bool caseSensitive );
 //finds a match for the given string using the match templates
 int BotFindMatch(char *str, bot_match_t *match, unsigned long int context);
 //returns a variable from a match
