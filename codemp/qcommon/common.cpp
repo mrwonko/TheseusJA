@@ -59,7 +59,6 @@ cvar_t	*com_G2Report;
 
 cvar_t	*com_version;
 cvar_t	*com_buildScript;	// for automated data building scripts
-cvar_t	*com_bootlogo;
 cvar_t	*cl_paused;
 cvar_t	*sv_paused;
 cvar_t	*com_cameraMode;
@@ -1239,8 +1238,6 @@ void Com_Init( char *commandLine ) {
 		com_affinity = Cvar_Get( "com_affinity", "0", CVAR_ARCHIVE_ND );
 		com_busyWait = Cvar_Get( "com_busyWait", "0", CVAR_ARCHIVE_ND );
 
-		com_bootlogo = Cvar_Get( "com_bootlogo", "1", CVAR_ARCHIVE_ND, "Show intro movies" );
-
 		s = va("%s %s %s", JK_VERSION_OLD, PLATFORM_STRING, SOURCE_DATE );
 		com_version = Cvar_Get ("version", s, CVAR_ROM | CVAR_SERVERINFO );
 
@@ -1269,17 +1266,7 @@ void Com_Init( char *commandLine ) {
 
 
 		// add + commands from command line
-		if ( !Com_AddStartupCommands() )
-		{
-			// if the user didn't give any commands, run default action
-			if ( !com_dedicated->integer )
-			{
-				if ( com_bootlogo->integer )
-				{
-					Cbuf_AddText ("cinematic openinglogos.roq\n");
-				}
-			}
-		}
+		Com_AddStartupCommands();
 
 		// start in full screen ui mode
 		Cvar_Set("r_uiFullScreen", "1");
