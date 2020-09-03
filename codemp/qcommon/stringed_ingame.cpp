@@ -949,6 +949,7 @@ const char *SE_Load( const char *psFileName, SE_BOOL bLoadDebug = SE_TRUE, SE_BO
 
 	// check for any corresponding / overriding .STE files and load them afterwards...
 	//
+	// TODO (mrw): remove, the editor that exports .STE files never got released.
 	if ( !psErrorMessage )
 	{
 		char sFileName[ iSE_MAX_FILENAME_LENGTH ];
