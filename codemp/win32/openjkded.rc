@@ -81,11 +81,11 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "Comments", "OpenJK Contributors"
-            VALUE "FileDescription", "OpenJK Dedicated Server"
+            VALUE "FileDescription", "First Person Synapse Dedicated Server"
             VALUE "FileVersion", VERSION_STRING
-            VALUE "InternalName", "JK MP Ded"
-            VALUE "OriginalFilename", "OpenJKDed.exe"
-            VALUE "ProductName", "OpenJK Dedicated Server"
+            VALUE "InternalName", "FirstPersonSynapse Ded"
+            VALUE "OriginalFilename", "FirstPersonSynapseDed.exe"
+            VALUE "ProductName", "First Person Synapse Dedicated Server"
             VALUE "ProductVersion", VERSION_STRING
         END
     END

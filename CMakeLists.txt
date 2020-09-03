@@ -143,13 +143,13 @@ message(STATUS "Git revision is ${GIT_SHA1}")
 
 
 # Binary names
-set(MPEngine "openjk.${Architecture}")
+set(MPEngine "firstpersonsynapse.${Architecture}")
 set(MPVanillaRenderer "rd-vanilla_${Architecture}")
-set(MPDed "openjkded.${Architecture}")
-set(MPGame "jampgame${Architecture}")
+set(MPDed "firstpersonsynapseded.${Architecture}")
+set(MPGame "firstpersonsynapsegame${Architecture}")
 set(MPCGame "cgame${Architecture}")
 set(MPUI "ui${Architecture}")
-set(AssetsPk3 "openjk-${Architecture}.pk3")
+set(AssetsPk3 "firstpersonsynapse-${Architecture}.pk3")
 # Library names
 set(MPBotLib "botlib")
 set(SharedLib "shared")
