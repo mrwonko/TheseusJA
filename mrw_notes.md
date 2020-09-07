@@ -93,3 +93,20 @@ I'm going to replace the entire game logic, since I need unwind functionality, i
 * optionally show multiple recorded paths of other character simultaneously, to preview interaction with each?
   * can't show interaction of each combination of recordings, too many
   * alternatively/additionally just allow quickly switching between different character paths (mouse wheel?)
+
+## Menu Flow / Starting a game
+
+* how do I test maps as a level designer?
+  * play against yourself. good for practice, too.
+* lobby system
+  * someone opens a lobby
+    * a random mode and map are pre-selected and can be customized
+  * at any point the lobby can be published and un-published
+  * people join the lobby and select which character(s) they want to control, until all characters are controlled
+  * as soon as you join the lobby, the map starts loading. You see everyone's progress.
+  * once everyone's ready and has loaded the map, the game starts
+
+## Questions
+
+* Should team mates see each other's plan? Try both.
+  * also applies when players control multiple characters
