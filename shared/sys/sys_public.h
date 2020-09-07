@@ -37,10 +37,8 @@ typedef enum netadrtype_s
 typedef struct netadr_s
 {
 	netadrtype_t	type;
-	union {
-		byte		ip[4];
-		int32_t		ipi;
-	};
+
+	byte		ip[4];
 	uint16_t	port;
 } netadr_t;
 
