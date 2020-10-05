@@ -615,7 +615,7 @@ void WP_SetSaberEntModelSkin( gentity_t *ent, gentity_t *saberent )
 	//set skin, too
 	if ( ent->client->ps.saber[0].skin == NULL )
 	{
-		gi.G2API_SetSkin( &saberent->ghoul2[0], -1, 0 );
+		//gi.G2API_SetSkin( &saberent->ghoul2[0], -1, 0 );
 	}
 	else
 	{//if this saber has a customSkin, use it
@@ -994,7 +994,7 @@ Ghoul2 Insert Start
 			WP_SetSaberEntModelSkin( ent, saberent );
 
 			// set up a bolt on the end so we can get where the sabre muzzle is - we can assume this is always bolt 0
-			gi.G2API_AddBolt( &saberent->ghoul2[0], "*flash" );
+			//gi.G2API_AddBolt( &saberent->ghoul2[0], "*flash" );
 			//gi.G2API_SetLodBias( &saberent->ghoul2[0], 0 );
 			if ( ent->client->ps.dualSabers )
 			{

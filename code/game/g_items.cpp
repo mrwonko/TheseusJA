@@ -1271,7 +1271,7 @@ void ClearRegisteredItems( void ) {
 
 	//these are given in g_client, ClientSpawn(), but MUST be registered HERE, BEFORE cgame starts.
 	//RegisterItem( FindItemForWeapon( WP_NONE ) );	//has no item
-	RegisterItem( FindItemForInventory( INV_ELECTROBINOCULARS ));
+	//RegisterItem( FindItemForInventory( INV_ELECTROBINOCULARS ));
 	//RegisterItem( FindItemForInventory( INV_BACTA_CANISTER ));
 	// saber or baton is cached in SP_info_player_deathmatch now.
 

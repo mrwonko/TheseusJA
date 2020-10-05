@@ -70,21 +70,6 @@ Targets will be fired when someone spawns in on them.
 void SP_info_player_deathmatch(gentity_t *ent) {
 	SP_misc_teleporter_dest (ent);
 
-	if ( ent->spawnflags & 32 ) // STUN_BATON
-	{
-		RegisterItem( FindItemForWeapon( WP_STUN_BATON ));
-	}
-	else
-	{
-		RegisterItem( FindItemForWeapon( WP_SABER ) );	//these are given in ClientSpawn(), but we register them now before cgame starts
-		saberInfo_t	saber;
-		WP_SaberParseParms( g_saber->string, &saber );//get saber sounds and models cached before client begins
-		if (saber.model) G_ModelIndex( saber.model );
-		if (saber.brokenSaber1) G_ModelIndex( saber.brokenSaber1 );
-		if (saber.brokenSaber2) G_ModelIndex( saber.brokenSaber2 );
-		if (saber.skin) G_SkinIndex( saber.skin );
-		WP_SaberFreeStrings(saber);
-	}
 }
 
 /*QUAKED info_player_start (1 0 0) (-16 -16 -24) (16 16 32) KEEP_PREV DROPTOFLOOR x x x STUN_BATON NOWEAPON x
@@ -1783,6 +1768,7 @@ void G_SetG2PlayerModel( gentity_t * const ent, const char *modelName, const cha
 	}
 	if (ent->playerModel == -1)
 	{//very bad thing here!
+		return; // it'll be fine, don't worry about it
 		Com_Error(ERR_DROP, "Cannot fall back to default model %s!", modelName);
 	}
 
