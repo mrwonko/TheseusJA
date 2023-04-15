@@ -1,0 +1,1 @@
+{"body":"Apparently, texture interpolation is currently only modifiable client-wide using the `r_textureMode` cvar. Artists would prefer to be able to choose it per shader stage.","closed":false,"comments":[],"labels":[],"milestone":null,"projectCards":[],"projectItems":[],"state":"OPEN","title":"interpolation shader keyword"}
