@@ -12,6 +12,7 @@
 #pragma warning ( disable : 4663 )	//spcialize class
 #pragma warning( push, 3 )
 #include <algorithm>
+#include <string>
 #pragma warning (pop)
 
 #ifdef _XBOX

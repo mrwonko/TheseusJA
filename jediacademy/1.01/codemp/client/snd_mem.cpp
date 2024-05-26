@@ -6,6 +6,7 @@
 #include "snd_local.h"
 #include "snd_mp3.h"
 #include "snd_ambient.h"
+#include <string>
 
 // Open AL
 void S_PreProcessLipSync(sfx_t *sfx);
