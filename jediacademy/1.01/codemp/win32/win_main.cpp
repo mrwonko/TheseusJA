@@ -696,11 +696,7 @@ Return true if the proper CD is in the drive
 ================
 */
 qboolean	Sys_CheckCD( void ) {
-#ifdef FINAL_BUILD
-	return Sys_ScanForCD();
-#else
 	return qtrue;
-#endif
 }
 
 
