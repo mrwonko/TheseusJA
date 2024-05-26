@@ -606,7 +606,7 @@ bool Sys_FileOutOfDate( LPCSTR psFinalFileName /* dest */, LPCSTR psDataFileName
 		// timer res only accurate to within 2 seconds on FAT, so can't do exact compare...
 		//
 		//LONG l = CompareFileTime( &ftFinalFile, &ftDataFile );
-		if (  (abs(ftFinalFile.dwLowDateTime - ftDataFile.dwLowDateTime) <= 20000000 ) &&
+		if (  (abs(static_cast<int>(ftFinalFile.dwLowDateTime - ftDataFile.dwLowDateTime)) <= 20000000 ) &&
 				  ftFinalFile.dwHighDateTime == ftDataFile.dwHighDateTime				
 			)
 		{
