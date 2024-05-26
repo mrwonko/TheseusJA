@@ -60,9 +60,6 @@
     <Filter Include="zlib32">
       <UniqueIdentifier>{c20867aa-39e9-4f85-b243-6b8f9cd48604}</UniqueIdentifier>
     </Filter>
-    <Filter Include="SmartHeap">
-      <UniqueIdentifier>{794d40ee-f9f6-428f-b443-6ccf3d7a2fea}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Debug">
       <UniqueIdentifier>{2d55c109-2eab-4037-a742-f83d5a1822c3}</UniqueIdentifier>
     </Filter>
@@ -510,9 +507,6 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="client\0_SH_Leak.cpp">
-      <Filter>Client</Filter>
-    </ClCompile>
     <ClCompile Include="client\FXExport.cpp">
       <Filter>Client</Filter>
     </ClCompile>
@@ -1035,9 +1029,6 @@
     <ClCompile Include="zlib32\zipcommon.cpp">
       <Filter>zlib32</Filter>
     </ClCompile>
-    <ClCompile Include="smartheap\SMRTHEAP.C">
-      <Filter>SmartHeap</Filter>
-    </ClCompile>
     <ClCompile Include="RMG\RM_Area.cpp">
       <Filter>RMG</Filter>
     </ClCompile>
@@ -1106,24 +1097,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="smartheap\HA312W32.DLL">
-      <Filter>SmartHeap</Filter>
-    </CustomBuild>
-    <CustomBuild Include="smartheap\HAW32M.LIB">
-      <Filter>SmartHeap</Filter>
-    </CustomBuild>
-    <CustomBuild Include="smartheap\HEAPAGNT.H">
-      <Filter>SmartHeap</Filter>
-    </CustomBuild>
-    <CustomBuild Include="smartheap\SHW32.DLL">
-      <Filter>SmartHeap</Filter>
-    </CustomBuild>
-    <CustomBuild Include="smartheap\SMRTHEAP.H">
-      <Filter>SmartHeap</Filter>
-    </CustomBuild>
-    <CustomBuild Include="smartheap\smrtheap.hpp">
-      <Filter>SmartHeap</Filter>
-    </CustomBuild>
     <CustomBuild Include="Debug\HA312W32.DLL">
       <Filter>Debug</Filter>
     </CustomBuild>
