@@ -1,2 +1,13 @@
 .vs/
 *.vcxproj.user
+*.sbr
+*.dll
+*.exe
+*.bsc
+*.pdb
+*.ilk
+*.exe.recipe
+*.lib
+*.exp
+# more specific because we don't want to ignore levels
+*x86.map
