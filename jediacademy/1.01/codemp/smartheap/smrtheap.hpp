@@ -160,15 +160,6 @@ inline void MEM_FAR *operator new[](size_t new_sz, void MEM_FAR *lpMem,
 #ifndef _CRTIMP
 #define _CRTIMP
 #endif // _CRTIMP
-#ifdef _MSC_VER
-_CRTIMP _PNH MEM_ENTRY_ANSI _set_new_handler(_PNH);
-#if UINT_MAX == 0xFFFFu
-_PNH MEM_ENTRY_ANSI _set_fnew_handler(_PNH);
-_PNHH MEM_ENTRY_ANSI _set_hnew_handler(_PNHH);
-#endif // UINT_MAX
-#endif // _MSC_VER
-typedef void (MEM_ENTRY_ANSI * pnh)();
-_CRTIMP pnh MEM_ENTRY_ANSI set_new_handler(pnh) MEM_CPP_THROW;
 
 #ifndef DBG_FORMAL
 #define DBG_FORMAL
