@@ -932,8 +932,8 @@ static rserr_t GLW_SetMode( int mode,
 
 bool GL_CheckForExtension(const char *ext)
 {
-	char	*temp;
-	char	term;
+	const char	*temp;
+	char		term;
 
 	temp = strstr(glConfig.extensions_string, ext);
 	if(!temp)
