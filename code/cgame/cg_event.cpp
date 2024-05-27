@@ -230,26 +230,6 @@ static void CG_UseItem( centity_t *cent )
 
 }
 
-#ifdef _IMMERSION
-qboolean CG_ConfigForce( int index, const char *&name, int &channel )
-{
-	qboolean result = qfalse;
-	const char *configstring = CG_ConfigString( CS_FORCES + index );
-
-	result = qboolean
-	(	configstring
-	&&	sscanf( configstring, "%d", &channel ) == 1
-	);
-
-	if ( result )
-	{
-		name = strchr( configstring, ',' ) + 1;
-		result = qboolean( name != (char *)1 );
-	}
-
-	return result;
-}
-#endif // _IMMERSION
 /*
 ==============
 CG_EntityEvent
@@ -382,9 +362,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		if ( g_entities[es->number].health <= 0 )
 		{//dead
 			cgi_S_StartSound( NULL, es->number, CHAN_AUTO, cgs.media.landSound  );
-#ifdef _IMMERSION
-			cgi_FF_Start( cgs.media.landForce, es->number );
-#endif // _IMMERSION
 		}
 		else if ( g_entities[es->number].s.weapon == WP_SABER )
 		{//jedi
@@ -465,25 +442,16 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 	case EV_WATER_TOUCH:
 		DEBUGNAME("EV_WATER_TOUCH");
 		cgi_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.watrInSound );
-#ifdef _IMMERSION
-		cgi_FF_Start( cgs.media.watrInSound, es->number );
-#endif // _IMMERSION
 		break;
 	
 	case EV_WATER_LEAVE:
 		DEBUGNAME("EV_WATER_LEAVE");
 		cgi_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.watrOutSound );
-#ifdef _IMMERSION
-		cgi_FF_Start( cgs.media.watrOutSound, es->number );
-#endif // _IMMERSION
 		break;
 	
 	case EV_WATER_UNDER:
 		DEBUGNAME("EV_WATER_UNDER");
 		cgi_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.watrUnSound );
-#ifdef _IMMERSION
-		cgi_FF_Start( cgs.media.watrUnSound, es->number );
-#endif // _IMMERSION
 		break;
 	
 	case EV_WATER_CLEAR:
@@ -522,9 +490,6 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 			}
 			item = &bg_itemlist[ index ];
 			cgi_S_StartSound (NULL, es->number, CHAN_AUTO,	cgi_S_RegisterSound( item->pickup_sound ) );
-#ifdef _IMMERSION
-			cgi_FF_Start( cgi_FF_Register( item->pickup_force, FF_CHANNEL_TOUCH ), es->number );
-#endif // _IMMERSION
 
 			// show icon and name on status bar
 			if ( es->number == cg.snap->ps.clientNum ) {
@@ -567,17 +532,11 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		{
 			// custom select sound
 			cgi_S_StartSound (NULL, es->number, CHAN_AUTO, cgi_S_RegisterSound( weaponData[cg.weaponSelect].selectSnd ));
-#ifdef _IMMERSION
-			cgi_FF_Start( cgi_FF_Register( weaponData[cg.weaponSelect].selectFrc, FF_CHANNEL_WEAPON ), es->number );
-#endif // _IMMERSION
 		}
 		else
 		{
 			// generic sound
 			cgi_S_StartSound (NULL, es->number, CHAN_AUTO, cgs.media.selectSound );
-#ifdef _IMMERSION
-			cgi_FF_Start( cgs.media.selectForce, es->number );
-#endif // _IMMERSION
 		}
 		break;
 
@@ -782,49 +741,21 @@ void CG_EntityEvent( centity_t *cent, vec3_t position ) {
 		}
 		break;
 
-#ifdef _IMMERSION
+#pragma region legacy Force Feedback events kept for backwards compatibility
 	case EV_ENTITY_FORCE:				// Plays force on entity
 		DEBUGNAME("EV_ENTITY_FORCE");
-		if ( !cgs.force_precache[ es->eventParm ] )
-		{
-			const char *name;
-			int channel;
-			if ( CG_ConfigForce( es->eventParm, name, channel ) )
-			{
-				cgs.force_precache[ es->eventParm ] = cgi_FF_Register( name, channel );
-			}
-		}
-		cgi_FF_Start( cgs.force_precache[ es->eventParm ], es->number );
 		break;
 
 	case EV_GLOBAL_FORCE:
 	case EV_AREA_FORCE:
 		DEBUGNAME("EV_AREA_FORCE");	// Plays force for anyone
-		if ( !cgs.force_precache[ es->eventParm ] )
-		{
-			const char *name;
-			int channel;
-			if ( CG_ConfigForce( es->eventParm, name, channel ) )
-			{
-				cgs.force_precache[ es->eventParm ] = cgi_FF_Register( name, channel );
-			}
-		}
-		cgi_FF_Start( cgs.force_precache[ es->eventParm ], es->number );
 		break;
 
 	case EV_FORCE_STOP:
 		DEBUGNAME("EV_FORCE_STOP");
-		if ( es->eventParm < 0 )
-		{
-			cgi_FF_StopAll( );
-		}
-		else if ( es->eventParm < MAX_FORCES && cgs.force_precache[ es->eventParm ] )
-		{
-			cgi_FF_Stop( cgs.force_precache[ es->eventParm ], es->number );
-		}
-		
 		break;
-#endif // _IMMERSION
+#pragma endregion
+
 	case EV_DRUGGED:
 		DEBUGNAME("EV_DRUGGED");
 		if ( cent->gent && cent->gent->owner && cent->gent->owner->s.number == 0 )

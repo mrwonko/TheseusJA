@@ -297,12 +297,12 @@ typedef enum {
 	EV_GENERAL_SOUND,
 	EV_GLOBAL_SOUND,		// no attenuation
 
-#ifdef _IMMERSION
+#pragma region legacy force feedback events kept for backwards compatibility
 	EV_ENTITY_FORCE,
 	EV_AREA_FORCE,
 	EV_GLOBAL_FORCE,
 	EV_FORCE_STOP,
-#endif // _IMMERSION
+#pragma endregion
 	EV_PLAY_EFFECT,
 	EV_PLAY_MUZZLE_EFFECT,
 

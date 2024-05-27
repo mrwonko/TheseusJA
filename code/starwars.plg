@@ -8,7 +8,7 @@
 <h3>Command Lines</h3>
 Creating temporary file "C:\DOCUME~1\jmonroe\LOCALS~1\Temp\RSP4829.tmp" with contents
 [
-/nologo /G6 /MLd /W4 /Gm /Gi /GX /ZI /Od /I "..\ICARUS" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "_IMMERSION" /FR"..\Debug\game/" /Fp"..\Debug\game/game.pch" /Yu"g_headers.h" /Fo"..\Debug\game/" /Fd"..\Debug\game/" /FD /c 
+/nologo /G6 /MLd /W4 /Gm /Gi /GX /ZI /Od /I "..\ICARUS" /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /FR"..\Debug\game/" /Fp"..\Debug\game/game.pch" /Yu"g_headers.h" /Fo"..\Debug\game/" /Fd"..\Debug\game/" /FD /c 
 "C:\projects\jk2\CODE\game\g_combat.cpp"
 ]
 Creating command line "cl.exe @C:\DOCUME~1\jmonroe\LOCALS~1\Temp\RSP4829.tmp" 
