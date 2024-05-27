@@ -1202,10 +1202,6 @@ static void Com_WriteCDKey( const char *filename, const char *ikey ) {
 #endif // USE_CD_KEY
 
 
-#ifdef MEM_DEBUG
-	void SH_Register(void);
-#endif
-
 /*
 =================
 Com_Init
@@ -1422,10 +1418,6 @@ void Com_Init( char *commandLine ) {
 
 		// make sure single player is off by default
 		Cvar_Set("ui_singlePlayerActive", "0");
-
-#ifdef MEM_DEBUG
-		SH_Register();
-#endif
 
 		com_fullyInitialized = qtrue;
 		Com_Printf ("--- Common Initialization Complete ---\n");	

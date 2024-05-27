@@ -91,7 +91,7 @@
 				Optimization="0"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="ff/ifc"
-				PreprocessorDefinitions="_DEBUG,MEM_DEBUG,_JK2EXE,WIN32,_WINDOWS,_IMMERSION,_FF"
+				PreprocessorDefinitions="_DEBUG,_JK2EXE,WIN32,_WINDOWS,_IMMERSION,_FF"
 				RuntimeLibrary="5"
 				UsePrecompiledHeader="2"
 				PrecompiledHeaderThrough="..\server\exe_headers.h"
@@ -1968,37 +1968,6 @@
 				</FileConfiguration>
 			</File>
 			<Filter
-				Name="0_compiled_first"
-				Filter="">
-				<File
-					RelativePath=".\0_compiled_first\0_SH_Leak.cpp">
-					<FileConfiguration
-						Name="Debug|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="SHDebug|Win32">
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="FinalBuild|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-				</File>
-			</Filter>
-			<Filter
 				Name="EAX"
 				Filter="">
 				<File
@@ -2028,73 +1997,6 @@
 				</File>
 				<File
 					RelativePath=".\client\OpenAL\alut.h">
-				</File>
-			</Filter>
-			<Filter
-				Name="smartheap"
-				Filter="">
-				<File
-					RelativePath=".\SHDebug\HA312W32.DLL">
-				</File>
-				<File
-					RelativePath=".\smartheap\HAW32M.LIB">
-					<FileConfiguration
-						Name="Debug|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCustomBuildTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="FinalBuild|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCustomBuildTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCustomBuildTool"/>
-					</FileConfiguration>
-				</File>
-				<File
-					RelativePath=".\smartheap\HEAPAGNT.H">
-				</File>
-				<File
-					RelativePath=".\SHDebug\SHW32.DLL">
-				</File>
-				<File
-					RelativePath=".\smartheap\SMRTHEAP.C">
-					<FileConfiguration
-						Name="Debug|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="SHDebug|Win32">
-						<Tool
-							Name="VCCLCompilerTool"
-							UsePrecompiledHeader="0"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="FinalBuild|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-					<FileConfiguration
-						Name="Release|Win32"
-						ExcludedFromBuild="TRUE">
-						<Tool
-							Name="VCCLCompilerTool"/>
-					</FileConfiguration>
-				</File>
-				<File
-					RelativePath=".\smartheap\SMRTHEAP.H">
-				</File>
-				<File
-					RelativePath=".\smartheap\smrtheap.hpp">
 				</File>
 			</Filter>
 		</Filter>
