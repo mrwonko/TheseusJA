@@ -9,14 +9,8 @@
 
 
 
-#ifdef _XBOX
-#include "../goblib/goblib.h"
-
-typedef int wfhandle_t;
-#else
 #include "../zlib32/zip.h"
 #include "unzip.h"
-#endif
 
 
 #define MAX_ZPATH			256

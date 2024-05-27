@@ -5,14 +5,8 @@
    Structures local to the files_* modules.
 */
 
-#ifdef _XBOX
-#include "../goblib/goblib.h"
-
-typedef int wfhandle_t;
-#else
 #include "../zlib32/zip.h"
 #include "unzip.h"
-#endif
 
 #define	BASEGAME			"base"
 #define	DEMOGAME			"demo"
