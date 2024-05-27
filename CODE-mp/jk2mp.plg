@@ -8,7 +8,7 @@
 <h3>Command Lines</h3>
 Creating temporary file "C:\DOCUME~1\jmonroe\LOCALS~1\Temp\RSP64B.tmp" with contents
 [
-/nologo /G6 /MLd /W3 /GX /ZI /Od /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "_JK2" /D "MEM_DEBUG" /Fr".\Debug\jk2/" /Fo".\Debug\jk2/" /Fd".\Debug\jk2/" /FD /GZ /c 
+/nologo /G6 /MLd /W3 /GX /ZI /Od /D "_DEBUG" /D "WIN32" /D "_WINDOWS" /D "_JK2" /Fr".\Debug\jk2/" /Fo".\Debug\jk2/" /Fd".\Debug\jk2/" /FD /GZ /c 
 "C:\projects\jk2\CODE-mp\win32\win_wndproc.cpp"
 ]
 Creating command line "cl.exe @C:\DOCUME~1\jmonroe\LOCALS~1\Temp\RSP64B.tmp" 
@@ -186,7 +186,6 @@ Creating temporary file "C:\DOCUME~1\jmonroe\LOCALS~1\Temp\RSP64C.tmp" with cont
 ".\Debug\jk2\sockets.obj"
 ".\Debug\jk2\SMRTHEAP.OBJ"
 ".\win32\winquake.res"
-".\smartheap\HAW32M.LIB"
 ".\Debug\botlib.lib"
 ".\Debug\uix86.lib"
 ".\Debug\cgamex86.lib"
