@@ -230,10 +230,6 @@ SOURCE=..\win32\win_qgl.cpp
 # PROP Default_Filter "h;hpp;hxx;hm;inl"
 # Begin Source File
 
-SOURCE=.\amd3d.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\game\channels.h
 # End Source File
 # Begin Source File
