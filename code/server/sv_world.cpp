@@ -25,10 +25,6 @@ Ghoul2 Insert Start
 /*
 Ghoul2 Insert End
 */
-#if MEM_DEBUG
-#include "..\smartheap\heapagnt.h"
-#define SV_TRACE_PROFILE (0)
-#endif
 
 /*
 ================
@@ -447,15 +443,6 @@ int SV_AreaEntities( const vec3_t mins, const vec3_t maxs, gentity_t **list, int
 	ap.count = 0;
 	ap.maxcount = maxcount;
 
-#if SV_TRACE_PROFILE
-#if MEM_DEBUG
-	{
-		int old=dbgMemSetCheckpoint(2003);
-		malloc(1);
-		dbgMemSetCheckpoint(old);
-	}
-#endif
-#endif
 	SV_AreaEntities_r( sv_worldSectors, &ap );
 
 	return ap.count;
@@ -703,16 +690,6 @@ Ghoul2 Insert End
 #ifdef _DEBUG
 	assert( !_isnan(start[0])&&!_isnan(start[1])&&!_isnan(start[2])&&!_isnan(end[0])&&!_isnan(end[1])&&!_isnan(end[2]));
 #endif// _DEBUG
-
-#if SV_TRACE_PROFILE
-#if MEM_DEBUG
-	{
-		int old=dbgMemSetCheckpoint(2002);
-		malloc(1);
-		dbgMemSetCheckpoint(old);
-	}
-#endif
-#endif
 
 	moveclip_t	clip;
 	int			i;

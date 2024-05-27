@@ -129,7 +129,7 @@ LINK32=link.exe
 # PROP Ignore_Export_Lib 1
 # PROP Target_Dir ""
 # ADD BASE CPP /nologo /G6 /W4 /Gm /Gi /GX /ZI /Od /I "..\ICARUS" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FR /Yu"g_headers.h" /FD /c
-# ADD CPP /nologo /G6 /W4 /Gm /Gi /GX /ZI /Od /I "..\ICARUS" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /D "MEM_DEBUG" /FR /Yu"g_headers.h" /FD /c
+# ADD CPP /nologo /G6 /W4 /Gm /Gi /GX /ZI /Od /I "..\ICARUS" /D "WIN32" /D "_DEBUG" /D "_WINDOWS" /FR /Yu"g_headers.h" /FD /c
 # ADD BASE MTL /nologo /D "_DEBUG" /mktyplib203 /win32
 # ADD MTL /nologo /D "_DEBUG" /mktyplib203 /win32
 # ADD BASE RSC /l 0x409 /d "_DEBUG"
@@ -815,29 +815,6 @@ SOURCE=.\q_shared.cpp
 # End Source File
 # Begin Source File
 
-SOURCE=..\smartheap\SMRTHEAP.C
-
-!IF  "$(CFG)" == "game - Win32 Release"
-
-# PROP Exclude_From_Build 1
-
-!ELSEIF  "$(CFG)" == "game - Win32 Debug"
-
-# PROP Exclude_From_Build 1
-
-!ELSEIF  "$(CFG)" == "game - Win32 FinalBuild"
-
-# PROP Exclude_From_Build 1
-
-!ELSEIF  "$(CFG)" == "game - Win32 SHDebug"
-
-# SUBTRACT CPP /YX /Yc /Yu
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
 SOURCE=..\qcommon\tri_coll_test.cpp
 # ADD CPP /Yu"common_headers.h"
 # End Source File
@@ -1183,27 +1160,6 @@ SOURCE=..\base\ext_data\weapons.dat
 
 # PROP BASE Exclude_From_Build 1
 # PROP Exclude_From_Build 1
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
-SOURCE=..\smartheap\HAW32M.LIB
-
-!IF  "$(CFG)" == "game - Win32 Release"
-
-# PROP Exclude_From_Build 1
-
-!ELSEIF  "$(CFG)" == "game - Win32 Debug"
-
-# PROP Exclude_From_Build 1
-
-!ELSEIF  "$(CFG)" == "game - Win32 FinalBuild"
-
-# PROP Exclude_From_Build 1
-
-!ELSEIF  "$(CFG)" == "game - Win32 SHDebug"
 
 !ENDIF 
 
