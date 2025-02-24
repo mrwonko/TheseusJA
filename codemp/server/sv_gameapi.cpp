@@ -3089,9 +3089,11 @@ void SV_BindGame( void ) {
 	gvm = VM_Create( VM_GAME );
 	if ( gvm && !gvm->isLegacy ) {
 		gi.Print								= Com_Printf;
-		gi.Error								= Com_Error;
-		gi.Milliseconds							= Com_Milliseconds;
-		gi.PrecisionTimerStart					= SV_PrecisionTimerStart;
+		// it would be neat if this worked, but the template arguments cannot be deduced automatically
+		//gi.Error								= exceptionToLongjmpVararg(Com_VError);
+		gi.Error								= exceptionToLongjmpVarargImpl<decltype(&Com_VError), &Com_VError, const char*, int>;
+		gi.Milliseconds							= exceptionToLongjmp(Com_Milliseconds);
+		gi.PrecisionTimerStart					= exceptionToLongjmp(SV_PrecisionTimerStart);
 		gi.PrecisionTimerEnd					= SV_PrecisionTimerEnd;
 		gi.SV_RegisterSharedMemory				= SV_RegisterSharedMemory;
 		gi.RealTime								= Com_RealTime;
@@ -3111,7 +3113,7 @@ void SV_BindGame( void ) {
 		gi.FS_Read								= FS_Read;
 		gi.FS_Write								= FS_Write;
 		gi.AdjustAreaPortalState				= SV_AdjustAreaPortalState;
-		gi.AreasConnected						= CM_AreasConnected;
+		gi.AreasConnected						= exceptionToLongjmp(CM_AreasConnected);
 		gi.DebugPolygonCreate					= BotImport_DebugPolygonCreate;
 		gi.DebugPolygonDelete					= BotImport_DebugPolygonDelete;
 		gi.DropClient							= SV_GameDropClient;

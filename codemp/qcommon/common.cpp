@@ -246,12 +246,19 @@ do the appropriate things.
 =============
 */
 void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
-	va_list		argptr;
+	va_list argptr{};
+	va_start(argptr, fmt);
+	Com_VError(code, fmt, argptr);
+}
+
+// Wrapping-friendly Com_Error variant. Will va_end(argptr).
+void NORETURN QDECL Com_VError( int code, const char* fmt, va_list argptr ) {
 	static int	lastErrorTime;
 	static int	errorCount;
 	int			currentTime;
 
 	if ( com_errorEntered ) {
+		va_end(argptr);
 		Sys_Error( "recursive error after: %s", com_errorMessage );
 	}
 	com_errorEntered = qtrue;
@@ -280,9 +287,8 @@ void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
 	}
 	lastErrorTime = currentTime;
 
-	va_start (argptr,fmt);
 	Q_vsnprintf (com_errorMessage,sizeof(com_errorMessage), fmt,argptr);
-	va_end (argptr);
+	va_end(argptr);
 
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
 		Cvar_Get("com_errorMessage", "", CVAR_ROM);	//give com_errorMessage a default so it won't come back to life after a resetDefaults

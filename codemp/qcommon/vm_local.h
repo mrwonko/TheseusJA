@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "qfiles.h"
 #include <stdint.h>
+#include <csetjmp>
+#include <list>
 
 // Max number of arguments to pass from engine to vm's vmMain function.
 // command number + 12 arguments
@@ -192,3 +194,33 @@ void *VM_ExtraMemory_ClaimData( vm_t *vm, const void *data, uint32_t size );
 char *VM_ExtraMemory_ClaimString( vm_t *vm, const char *inputString );
 size_t VM_PtrToOffset( vm_t *vm, void *ptr );
 qboolean VM_IsCurrentQVM( void );
+
+extern std::list<std::jmp_buf> jmp_buf_stack;
+
+// to avoid throwing exceptions across module boundaries, we translate to longjmp in trap calls.
+template<typename Func, Func func, typename ...Args>
+typename std::result_of<Func(Args...)>::type QDECL
+exceptionToLongjmpImpl(Args... args) {
+	try {
+		return func(std::forward<Args>(args)...);
+	}
+	catch (int code) {
+		longjmp(jmp_buf_stack.front(), code + 1); // avoid implicitly turning code=0 into 1
+	}
+}
+#define exceptionToLongjmp(f) (exceptionToLongjmpImpl<decltype(&(f)), &(f)>)
+
+// for c-style vararg functions, we need a special wrapper that forwards via vlist
+template<typename Func, Func func, typename LastArg, typename ...Args>
+typename std::result_of<Func(Args..., LastArg, va_list)>::type QDECL
+exceptionToLongjmpVarargImpl(Args... args, LastArg lastArg, ...) {
+	try {
+		va_list vlist{};
+		va_begin(vlist, lastArg);
+		return func(std::forward<Args>(args)..., std::forward<LastArg>(lastArg>), vlist);
+	}
+	catch (int code) {
+		longjmp(jmp_buf_stack.front(), code + 1); // avoid implicitly turning code=0 into 1
+	}
+}
+#define exceptionToLongjmpVararg(f) (exceptionToLongjmpVarargImpl<decltype(&(f)), &(f)>)

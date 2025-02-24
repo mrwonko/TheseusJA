@@ -28,6 +28,9 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #include "qcommon/qcommon.h"
 #include "vm_local.h"
 
+// for nested vm calls, we need a stack of longjmp buffers
+std::list<std::jmp_buf> jmp_buf_stack;
+
 vm_t *currentVM = NULL;
 
 static const char *vmNames[MAX_VM] = {
