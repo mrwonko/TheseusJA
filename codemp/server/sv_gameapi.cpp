@@ -2092,7 +2092,7 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case G_ERROR:
-		Com_Error( ERR_DROP, "%s", VMA(1) );
+		Com_ErrorLongjmp( ERR_DROP, "%s", VMA(1) );
 		return 0;
 
 	case G_MILLISECONDS:
@@ -3059,7 +3059,7 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return SV_GetEntityToken((char *)VMA(1), args[2]);
 
 	default:
-		Com_Error( ERR_DROP, "Bad game system trap: %ld", (long int) args[0] );
+		Com_ErrorLongjmp( ERR_DROP, "Bad game system trap: %ld", (long int) args[0] );
 	}
 	return -1;
 }
@@ -3089,7 +3089,7 @@ void SV_BindGame( void ) {
 	gvm = VM_Create( VM_GAME );
 	if ( gvm && !gvm->isLegacy ) {
 		gi.Print								= Com_Printf;
-		gi.Error								= Com_Error;
+		gi.Error								= Com_ErrorLongjmp;
 		gi.Milliseconds							= Com_Milliseconds;
 		gi.PrecisionTimerStart					= SV_PrecisionTimerStart;
 		gi.PrecisionTimerEnd					= SV_PrecisionTimerEnd;

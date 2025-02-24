@@ -928,7 +928,7 @@ intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return FloatAsInt( Q_asin( VMF(1) ) );
 
 	case UI_ERROR:
-		Com_Error( ERR_DROP, "%s", VMA(1) );
+		Com_ErrorLongjmp( ERR_DROP, "%s", VMA(1) );
 		return 0;
 
 	case UI_PRINT:
@@ -1395,7 +1395,7 @@ intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return CL_G2API_AttachG2Model((void*)args[1], args[2], (void*)args[3], args[4], args[5]);
 
 	default:
-		Com_Error( ERR_DROP, "Bad UI system trap: %ld", (long int) args[0] );
+		Com_ErrorLongjmp( ERR_DROP, "Bad UI system trap: %ld", (long int) args[0] );
 
 	}
 
@@ -1413,7 +1413,7 @@ void CL_BindUI( void ) {
 	uivm = VM_Create( VM_UI );
 	if ( uivm && !uivm->isLegacy ) {
 		uii.Print								= Com_Printf;
-		uii.Error								= Com_Error;
+		uii.Error								= Com_ErrorLongjmp;
 		uii.Milliseconds						= CL_Milliseconds;
 		uii.RealTime							= Com_RealTime;
 		uii.MemoryRemaining						= Hunk_MemoryRemaining;

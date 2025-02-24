@@ -1070,7 +1070,7 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case CG_ERROR:
-		Com_Error( ERR_DROP, "%s", (const char*)VMA(1) );
+		Com_ErrorLongjmp( ERR_DROP, "%s", (const char*)VMA(1) );
 		return 0;
 
 	case CG_MILLISECONDS:
@@ -1862,7 +1862,7 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 
 	default:
 		assert(0); // bk010102
-		Com_Error( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );
+		Com_ErrorLongjmp( ERR_DROP, "Bad cgame system trap: %ld", (long int) args[0] );
 	}
 	return 0;
 }
@@ -1881,7 +1881,7 @@ void CL_BindCGame( void ) {
 	cgvm = VM_Create( VM_CGAME );
 	if ( cgvm && !cgvm->isLegacy ) {
 		cgi.Print								= Com_Printf;
-		cgi.Error								= Com_Error;
+		cgi.Error								= Com_ErrorLongjmp;
 		cgi.SnapVector							= Sys_SnapVector;
 		cgi.MemoryRemaining						= Hunk_MemoryRemaining;
 		cgi.RegisterSharedMemory				= RegisterSharedMemory;

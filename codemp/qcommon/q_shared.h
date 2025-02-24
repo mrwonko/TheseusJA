@@ -692,6 +692,7 @@ qboolean Info_NextPair( const char **s, char *key, char *value );
 	extern void (*Com_Printf)( const char *msg, ... );
 #else
 	void NORETURN QDECL Com_Error( int level, const char *error, ... );
+	void NORETURN QDECL Com_ErrorLongjmp(int level, const char* error, ...);
 	void QDECL Com_Printf( const char *msg, ... );
 #endif
 

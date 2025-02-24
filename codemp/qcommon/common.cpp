@@ -34,6 +34,9 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
+#include <csetjmp>
+
+static jmp_buf abortframe;
 
 FILE *debuglogfile;
 fileHandle_t logfile;
@@ -237,21 +240,13 @@ void QDECL Com_OPrintf( const char *fmt, ...)
 #endif
 }
 
-/*
-=============
-Com_Error
-
-Both client and server can use this, and it will
-do the appropriate things.
-=============
-*/
-void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
-	va_list		argptr;
+void NORETURN QDECL Com_ErrorImpl( qboolean useLongjmp, int code, const char* fmt, va_list argptr ) {
 	static int	lastErrorTime;
 	static int	errorCount;
 	int			currentTime;
 
 	if ( com_errorEntered ) {
+		va_end (argptr);
 		Sys_Error( "recursive error after: %s", com_errorMessage );
 	}
 	com_errorEntered = qtrue;
@@ -280,7 +275,6 @@ void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
 	}
 	lastErrorTime = currentTime;
 
-	va_start (argptr,fmt);
 	Q_vsnprintf (com_errorMessage,sizeof(com_errorMessage), fmt,argptr);
 	va_end (argptr);
 
@@ -290,6 +284,9 @@ void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
 	}
 
 	if ( code == ERR_DISCONNECT || code == ERR_SERVERDISCONNECT || code == ERR_DROP || code == ERR_NEED_CD ) {
+		if (useLongjmp) {
+			longjmp(abortframe, code+1); // +1 to avoid 0 value, which otherwise defaults to 1 (though in practice, code cannot be ERR_FATAL=0 here)
+		}
 		throw code;
 	} else {
 		CL_Shutdown ();
@@ -299,6 +296,39 @@ void NORETURN QDECL Com_Error( int code, const char *fmt, ... ) {
 	Com_Shutdown ();
 
 	Sys_Error ("%s", com_errorMessage);
+}
+
+
+/*
+=============
+Com_Error
+
+Both client and server can use this, and it will
+do the appropriate things.
+=============
+*/
+void NORETURN QDECL Com_Error( int code, const char* fmt, ... ) {
+	va_list		argptr;
+	va_start(argptr, fmt);
+	Com_ErrorImpl(qfalse, code, fmt, argptr);
+}
+
+/*
+=============
+Com_ErrorLongjmp
+
+A variant of Com_Error for use within module trap calls.
+Uses longjmp instead of exceptions to reduce the amount of undefined behavior.
+Note that if any destructors would need to be called, the behavior is still undefined.
+Modules are encouraged to use exceptions internally to ensure proper stack unwinding,
+and then only call Trap_Error at the engine boundary.
+We assume that modules written in C should Just Work.
+=============
+*/
+void NORETURN QDECL Com_ErrorLongjmp(int code, const char* fmt, ...) {
+	va_list		argptr;
+	va_start(argptr, fmt);
+	Com_ErrorImpl(qtrue, code, fmt, argptr);
 }
 
 
