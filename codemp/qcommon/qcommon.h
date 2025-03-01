@@ -293,7 +293,9 @@ struct vm_s {
 	// legacy stuff
 	struct {
 		VMMainProc* main; // module vmMain
-		intptr_t	(QDECL *syscall)( intptr_t *parms );	// engine syscall handler
+		intptr_t	(QDECL *syscall)( intptr_t *parms );	// active engine syscall handler
+		intptr_t	(QDECL *nativeSyscall)(intptr_t* parms);	// native syscall handler (for restarts)
+		intptr_t	(QDECL *qvmSyscall)(intptr_t* parms);	// qvm syscall handler (for restarts)
 	} legacy;
 
 	// QVM stuff
@@ -366,7 +368,7 @@ typedef enum {
 } sharedTraps_t;
 
 void			VM_Init( void );
-vm_t			*VM_CreateLegacy( vmSlots_t vmSlot, intptr_t (*systemCalls)(intptr_t *) );
+vm_t			*VM_CreateLegacy( vmSlots_t vmSlot, intptr_t (*nativeSystemCalls)(intptr_t *), intptr_t(*qvmSystemCalls)(intptr_t*));
 vm_t			*VM_Create( vmSlots_t vmSlot );
 void			 VM_Free( vm_t *vm );
 void			 VM_Clear(void);

@@ -1573,7 +1573,7 @@ void CL_BindUI( void ) {
 	}
 
 	// fall back to legacy syscall/vm_call api
-	uivm = VM_CreateLegacy( VM_UI, CL_UISystemCalls );
+	uivm = VM_CreateLegacy( VM_UI, CL_UISystemCalls, CL_UISystemCalls );
 	if ( !uivm ) {
 		cls.uiStarted = qfalse;
 		Com_Error( ERR_DROP, "VM_CreateLegacy on ui failed" );

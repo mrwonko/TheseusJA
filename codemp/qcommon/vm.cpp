@@ -112,7 +112,7 @@ vm_t *VM_Restart( vm_t *vm ) {
 	VM_Free( vm );
 
 	if ( saved.isLegacy )
-		return VM_CreateLegacy( saved.slot, saved.legacy.syscall );
+		return VM_CreateLegacy( saved.slot, saved.legacy.nativeSyscall, saved.legacy.qvmSyscall ); // FIXME: This will break when swapping native for qvm or vice-versa
 	else
 		return VM_Create( saved.slot );
 }
@@ -229,13 +229,13 @@ vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc, qboolean freeVM )
 	return header.h;
 }
 
-vm_t *VM_CreateLegacy( vmSlots_t vmSlot, intptr_t( *systemCalls )(intptr_t *) ) {
+vm_t *VM_CreateLegacy( vmSlots_t vmSlot, intptr_t( *nativeSystemCalls )(intptr_t *), intptr_t(*qvmSystemCalls)(intptr_t*)) {
 	vmHeader_t	*header;
 	vm_t *vm = NULL;
 	int remaining = Hunk_MemoryRemaining();
 	int interpret = vmModeCvar[vmSlot]->integer;
 
-	if ( !systemCalls ) {
+	if ( !nativeSystemCalls || !qvmSystemCalls ) {
 		Com_Error( ERR_FATAL, "VM_CreateLegacy: bad parms" );
 		return NULL;
 	}
@@ -252,10 +252,14 @@ vm_t *VM_CreateLegacy( vmSlots_t vmSlot, intptr_t( *systemCalls )(intptr_t *) ) 
 	vm->isLegacy = qtrue;
 	vm->slot = vmSlot;
 	Q_strncpyz( vm->name, vmNames[vmSlot], sizeof(vm->name) );
-	vm->legacy.syscall = systemCalls;
+	
+	// remember both callbacks for VM_Restart, as that could replace a native vm with a qvm or vice-versa
+	vm->legacy.nativeSyscall = nativeSystemCalls;
+	vm->legacy.qvmSyscall = qvmSystemCalls;
 
 	// QVM
 	if ( interpret != VMI_NATIVE && (header = VM_LoadQVM(vm, qtrue, qfalse)) ) {
+		vm->legacy.syscall = qvmSystemCalls;
 		// allocate space for the jump targets, which will be filled in by the compile/prep functions
 		vm->instructionCount = header->instructionCount;
 		vm->instructionPointers = (intptr_t *)Hunk_Alloc(vm->instructionCount * sizeof(*vm->instructionPointers), h_high);
@@ -296,6 +300,8 @@ vm_t *VM_CreateLegacy( vmSlots_t vmSlot, intptr_t( *systemCalls )(intptr_t *) ) 
 		Com_Printf("%s loaded in %d bytes on the hunk\n", vmNames[vmSlot], remaining - Hunk_MemoryRemaining());
 		return vm;
 	}
+
+	vm->legacy.syscall = nativeSystemCalls;
 
 	// find the legacy syscall api
 	FS_FindPureDLL( vm->name );

@@ -302,6 +302,7 @@ typedef struct sharedEntityMapper_s {
 #else
 	struct Vehicle_s		**m_pVehicle; //vehicle data
 #endif
+	// TODO: could we write a wrapper for this to handle the QVM-specific mapping logic?
 	void			**ghoul2; //g2 instance
 	int				*localAnimIndex; //index locally (game/cgame) to anim data for this skel
 	vec3_t			*modelScale; //needed for g2 collision

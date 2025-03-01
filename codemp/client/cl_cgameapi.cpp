@@ -32,6 +32,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #include "qcommon/vm_local.h"
 
 #include <unordered_map>
+#include <utility>
 
 extern IHeapAllocator *G2VertSpaceClient;
 extern botlib_export_t *botlib_export;
@@ -45,42 +46,27 @@ typedef std::unordered_map<g2handle_t, CGhoul2Info_v*> g2HandleToG2_m;
 static g2HandleToG2_m g2Mapping;
 static g2handle_t g2NextHandle = (g2handle_t)1; // Start at 1, because 0 has special meaning
 
-static inline CGhoul2Info_v *CL_G2Map_GetG2FromHandle( g2handleptr_t g2h )
-{ // Returns the pointer to the g2 object if the handle is valid
-	// Native libraries should not use the pointer, but in theory they could use
-	// it. Thus we don't perform any mapping for native libraries to avoid
-	// issues with custom modules.
-	if ( cgvm->dllHandle ) return (CGhoul2Info_v*)g2h;
-
-	g2handle_t g2handle = (g2handle_t)g2h;
+// Overload used in QVM to resolve numeric Ghoul2 handle into the corresponding object.
+static inline CGhoul2Info_v *CL_G2Map_GetG2FromHandle(g2handle_t g2handle )
+{
 	g2HandleToG2_m::iterator ghlIt = g2Mapping.find(g2handle);
 
 	if (ghlIt == g2Mapping.end()) return NULL;
 	return g2Mapping[g2handle];
 }
 
-static inline CGhoul2Info_v **CL_G2Map_GetG2PtrFromHandle( g2handleptr_t *g2h )
-{ // Returns a pointer to the g2 object pointer in the map so g2 functions can update the pointer
+// Overload used in native mode when actual pointers get passed around.
+static inline CGhoul2Info_v* CL_G2Map_GetG2FromHandle(CGhoul2Info_v* g2) {
+	// Returns the pointer to the g2 object.
 	// Native libraries should not use the pointer, but in theory they could use
 	// it. Thus we don't perform any mapping for native libraries to avoid
 	// issues with custom modules.
-	if ( cgvm->dllHandle ) return (CGhoul2Info_v **)g2h;
-
-	g2handle_t g2handle = *((g2handle_t*)g2h);
-	if ( !g2handle )
-	{ // Special case: the g2 handle is not valid, yet. Return a pointer to a static temporary pointer. Insertion is handled by calling CL_G2Map_Update after calling the G2API
-		static CGhoul2Info_v *g2Tmp;
-		g2Tmp = NULL;
-		return &g2Tmp;
-	}
-	return &g2Mapping[g2handle];
+	return g2;
 }
 
-static void CL_G2Map_Update( g2handleptr_t *g2h, CGhoul2Info_v *g2Ptr )
+// Overload used in QVM to update the handle (insert/erase)
+static void CL_G2Map_Update( g2handle_t *g2handle, CGhoul2Info_v *g2Ptr )
 { // Inserts and/or erases to/from the map and updates the handle pointer
-	if ( cgvm->dllHandle ) return;
-
-	g2handle_t *g2handle = (g2handle_t*)g2h;
 	if ( !*g2handle && g2Ptr )
 	{ // Got a 0 handle, but a non-0 pointer: add to map and set handle
 		// Unlikely to happen, but should we ever cycle through the whole integer range start searching for gaps
@@ -89,12 +75,15 @@ static void CL_G2Map_Update( g2handleptr_t *g2h, CGhoul2Info_v *g2Ptr )
 		g2Mapping[g2NextHandle] = g2Ptr;
 		*g2handle = g2NextHandle++;
 	}
-	else if ( *g2h && !g2Ptr )
+	else if ( *g2handle && !g2Ptr )
 	{ // Got a non-0 handle, but 0 pointer: remove from map and set handle to 0
 		g2Mapping.erase( *g2handle );
 		*g2handle = 0;
 	}
 }
+
+// Overload used in native mode when no mapping is required.
+static void CL_G2Map_Update(CGhoul2Info_v** g2h, CGhoul2Info_v* g2Ptr) {}
 
 //
 // cgame vmMain calls
@@ -496,8 +485,9 @@ static void CL_S_Shutup( qboolean shutup ) {
 	s_shutUp = shutup;
 }
 
+template<bool qvm>
 static void CL_R_AddRefEntityToScene( const refEntity_t *refEnt ) {
-	if ( cgvm->dllHandle ) {
+	if ( !qvm ) {
 		// We can directly pass the refEnt for native libraries
 		re->AddRefEntityToScene( refEnt );
 		return;
@@ -512,7 +502,7 @@ static void CL_R_AddRefEntityToScene( const refEntity_t *refEnt ) {
 	refEntity_t refEntCopy = *refEnt;
 
 	// Get the ghoul2 instance from the handle
-	refEntCopy.ghoul2 = CL_G2Map_GetG2FromHandle( (g2handleptr_t)refEnt->ghoul2 );
+	refEntCopy.ghoul2 = CL_G2Map_GetG2FromHandle( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)refEnt->ghoul2 );
 
 	// Pass our copy
 	re->AddRefEntityToScene( &refEntCopy );
@@ -602,10 +592,11 @@ static int CL_PrecisionTimerEnd( void *p ) {
 
 static void CL_RMG_Init( int /* terrainID */, const char * /* terrainInfo */ ) { }
 
-static qboolean CGFX_PlayBoltedEffectID( int id, vec3_t org, void *ghoul2, const int boltNum, const int entNum, const int modelNum, int iLooptime, qboolean isRelative ) {
+template<bool qvm>
+static qboolean CGFX_PlayBoltedEffectID( int id, vec3_t org, typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const int boltNum, const int entNum, const int modelNum, int iLooptime, qboolean isRelative ) {
 	if ( !ghoul2 ) return qfalse;
 
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle(ghoul2));
 	int boltInfo=0;
 	if ( re->G2API_AttachEnt( &boltInfo, g2, modelNum, boltNum, entNum, modelNum ) )
 	{
@@ -639,222 +630,258 @@ static void CL_G2API_ListModelBones( void *ghlInfo, int frame ) {
 	re->G2API_ListBones( (CGhoul2Info *)ghlInfo, frame );
 }
 
-static void CL_G2API_SetGhoul2ModelIndexes( void *ghoul2, qhandle_t *modelList, qhandle_t *skinList ) {
+template<bool qvm>
+static void CL_G2API_SetGhoul2ModelIndexes(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, qhandle_t *modelList, qhandle_t *skinList ) {
 	if ( !ghoul2 ) return;
-	re->G2API_SetGhoul2ModelIndexes( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelList, skinList );
+	re->G2API_SetGhoul2ModelIndexes( *(CL_G2Map_GetG2FromHandle(ghoul2)), modelList, skinList );
 }
 
-static qboolean CL_G2API_HaveWeGhoul2Models( void *ghoul2) {
+template<bool qvm>
+static qboolean CL_G2API_HaveWeGhoul2Models(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_HaveWeGhoul2Models( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)) );
+	return re->G2API_HaveWeGhoul2Models( *(CL_G2Map_GetG2FromHandle(ghoul2)) );
 }
 
-static qboolean CL_G2API_GetBoltMatrix( void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale ) {
+template<bool qvm>
+static qboolean CL_G2API_GetBoltMatrix(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_GetBoltMatrix( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale );
+	return re->G2API_GetBoltMatrix( *(CL_G2Map_GetG2FromHandle(ghoul2)), modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale );
 }
 
-static qboolean CL_G2API_GetBoltMatrix_NoReconstruct( void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale ) {
+template<bool qvm>
+static qboolean CL_G2API_GetBoltMatrix_NoReconstruct(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale ) {
 	if ( !ghoul2 ) return qfalse;
 	re->G2API_BoltMatrixReconstruction( qfalse );
-	return re->G2API_GetBoltMatrix( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale );
+	return re->G2API_GetBoltMatrix( *(CL_G2Map_GetG2FromHandle(ghoul2)), modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale );
 }
 
-static qboolean CL_G2API_GetBoltMatrix_NoRecNoRot( void *ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale ) {
+template<bool qvm>
+static qboolean CL_G2API_GetBoltMatrix_NoRecNoRot(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const int modelIndex, const int boltIndex, mdxaBone_t *matrix, const vec3_t angles, const vec3_t position, const int frameNum, qhandle_t *modelList, vec3_t scale ) {
 	if ( !ghoul2 ) return qfalse;
 	// Intentionally not setting bolt matrix reconstruction state per original code comments
 	re->G2API_BoltMatrixSPMethod( qtrue );
-	return re->G2API_GetBoltMatrix( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale );
+	return re->G2API_GetBoltMatrix( *(CL_G2Map_GetG2FromHandle(ghoul2)), modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale );
 }
 
-static int CL_G2API_InitGhoul2Model( void **ghoul2Ptr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias ) {
+template<bool qvm>
+static int CL_G2API_InitGhoul2Model(typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type ghoul2HandlePtr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 0;
 #endif
-	CGhoul2Info_v **g2Ptr = CL_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghoul2Ptr );
-	int ret = re->G2API_InitGhoul2Model( g2Ptr, fileName, modelIndex, customSkin, customShader, modelFlags, lodBias );
-	CL_G2Map_Update( (g2handleptr_t*)ghoul2Ptr, *g2Ptr );
+	assert(ghoul2HandlePtr);
+	CGhoul2Info_v *g2 = CL_G2Map_GetG2FromHandle( *ghoul2HandlePtr );
+	int ret = re->G2API_InitGhoul2Model( &g2, fileName, modelIndex, customSkin, customShader, modelFlags, lodBias );
+	CL_G2Map_Update( ghoul2HandlePtr, g2 );
 	return ret;
 }
 
-static qboolean CL_G2API_SetSkin( void *ghoul2, int modelIndex, qhandle_t customSkin, qhandle_t renderSkin ) {
+template<bool qvm>
+static qboolean CL_G2API_SetSkin(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int modelIndex, qhandle_t customSkin, qhandle_t renderSkin ) {
 	if ( !ghoul2 ) return qfalse;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle(ghoul2));
 	return re->G2API_SetSkin( g2, modelIndex, customSkin, renderSkin );
 }
 
-static void CL_G2API_CollisionDetect( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, vec3_t rayStart, vec3_t rayEnd, vec3_t scale, int traceFlags, int useLod, float fRadius ) {
+template<bool qvm>
+static void CL_G2API_CollisionDetect( CollisionRecord_t *collRecMap, typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, vec3_t rayStart, vec3_t rayEnd, vec3_t scale, int traceFlags, int useLod, float fRadius ) {
 	if ( !ghoul2 ) return;
-	re->G2API_CollisionDetect( collRecMap, *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), angles, position, frameNumber, entNum, rayStart, rayEnd, scale, G2VertSpaceClient, traceFlags, useLod, fRadius );
+	re->G2API_CollisionDetect( collRecMap, *(CL_G2Map_GetG2FromHandle(ghoul2)), angles, position, frameNumber, entNum, rayStart, rayEnd, scale, G2VertSpaceClient, traceFlags, useLod, fRadius );
 }
 
-static void CL_G2API_CollisionDetectCache( CollisionRecord_t *collRecMap, void* ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, vec3_t rayStart, vec3_t rayEnd, vec3_t scale, int traceFlags, int useLod, float fRadius ) {
+template<bool qvm>
+static void CL_G2API_CollisionDetectCache( CollisionRecord_t *collRecMap, typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const vec3_t angles, const vec3_t position, int frameNumber, int entNum, vec3_t rayStart, vec3_t rayEnd, vec3_t scale, int traceFlags, int useLod, float fRadius ) {
 	if ( !ghoul2 ) return;
-	re->G2API_CollisionDetectCache( collRecMap, *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), angles, position, frameNumber, entNum, rayStart, rayEnd, scale, G2VertSpaceClient, traceFlags, useLod, fRadius );
+	re->G2API_CollisionDetectCache( collRecMap, *(CL_G2Map_GetG2FromHandle(ghoul2)), angles, position, frameNumber, entNum, rayStart, rayEnd, scale, G2VertSpaceClient, traceFlags, useLod, fRadius );
 }
 
-static void CL_G2API_CleanGhoul2Models( void **ghoul2Ptr ) {
+template<bool qvm>
+static void CL_G2API_CleanGhoul2Models(typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type ghoul2HandlePtr ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 0;
 #endif
-	CGhoul2Info_v **g2Ptr = CL_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghoul2Ptr );
-	re->G2API_CleanGhoul2Models( g2Ptr );
-	CL_G2Map_Update( (g2handleptr_t*)ghoul2Ptr, *g2Ptr );
+	assert(ghoul2HandlePtr);
+	CGhoul2Info_v *g2 = CL_G2Map_GetG2FromHandle( *ghoul2HandlePtr );
+	re->G2API_CleanGhoul2Models( &g2 );
+	CL_G2Map_Update( ghoul2HandlePtr, g2 );
 }
 
-static qboolean CL_G2API_SetBoneAngles( void *ghoul2, int modelIndex, const char *boneName, const vec3_t angles, const int flags, const int up, const int right, const int forward, qhandle_t *modelList, int blendTime , int currentTime ) {
+template<bool qvm>
+static qboolean CL_G2API_SetBoneAngles(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int modelIndex, const char *boneName, const vec3_t angles, const int flags, const int up, const int right, const int forward, qhandle_t *modelList, int blendTime , int currentTime ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_SetBoneAngles( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boneName, angles, flags, (const Eorientations)up, (const Eorientations)right, (const Eorientations)forward, modelList, blendTime , currentTime );
+	return re->G2API_SetBoneAngles( *(CL_G2Map_GetG2FromHandle(ghoul2)), modelIndex, boneName, angles, flags, (const Eorientations)up, (const Eorientations)right, (const Eorientations)forward, modelList, blendTime , currentTime );
 }
 
-static qboolean CL_G2API_SetBoneAnim( void *ghoul2, const int modelIndex, const char *boneName, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame, const int blendTime ) {
+template<bool qvm>
+static qboolean CL_G2API_SetBoneAnim(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const int modelIndex, const char *boneName, const int startFrame, const int endFrame, const int flags, const float animSpeed, const int currentTime, const float setFrame, const int blendTime ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_SetBoneAnim( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boneName, startFrame, endFrame, flags, animSpeed, currentTime, setFrame, blendTime );
+	return re->G2API_SetBoneAnim( *(CL_G2Map_GetG2FromHandle(ghoul2)), modelIndex, boneName, startFrame, endFrame, flags, animSpeed, currentTime, setFrame, blendTime );
 }
 
-static qboolean CL_G2API_GetBoneAnim( void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList, const int modelIndex ) {
+template<bool qvm>
+static qboolean CL_G2API_GetBoneAnim(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *startFrame, int *endFrame, int *flags, float *animSpeed, int *modelList, const int modelIndex ) {
 	if ( !ghoul2 ) return qfalse;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle(ghoul2));
 	return re->G2API_GetBoneAnim( g2, modelIndex, boneName, currentTime, currentFrame, startFrame, endFrame, flags, animSpeed, modelList );
 }
 
-static qboolean CL_G2API_GetBoneFrame( void *ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *modelList, const int modelIndex ) {
+template<bool qvm>
+static qboolean CL_G2API_GetBoneFrame(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, const int currentTime, float *currentFrame, int *modelList, const int modelIndex ) {
 	if ( !ghoul2 ) return qfalse;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghoul2);
 	int iDontCare1 = 0, iDontCare2 = 0, iDontCare3 = 0;
 	float fDontCare1 = 0;
 
 	return re->G2API_GetBoneAnim(g2, modelIndex, boneName, currentTime, currentFrame, &iDontCare1, &iDontCare2, &iDontCare3, &fDontCare1, modelList);
 }
 
-static void CL_G2API_GetGLAName( void *ghoul2, int modelIndex, char *fillBuf ) {
+template<bool qvm>
+static void CL_G2API_GetGLAName(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int modelIndex, char *fillBuf ) {
 	if ( !ghoul2 )
 	{
 		fillBuf[0] = '\0';
 		return;
 	}
 
-	char *tmp = re->G2API_GetGLAName( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex );
+	char *tmp = re->G2API_GetGLAName( *CL_G2Map_GetG2FromHandle(ghoul2), modelIndex );
 	if ( tmp )
 		strcpy( fillBuf, tmp );
 	else
 		fillBuf[0] = '\0';
 }
 
-static int CL_G2API_CopyGhoul2Instance( void *g2From, void *g2To, int modelIndex ) {
+template<bool qvm>
+static int CL_G2API_CopyGhoul2Instance(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type g2From, typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type g2To, int modelIndex ) {
 	if ( !g2From || !g2To ) return 0;
 
-	return re->G2API_CopyGhoul2Instance( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)g2From)), *(CL_G2Map_GetG2FromHandle((g2handleptr_t)g2To)), modelIndex );
+	return re->G2API_CopyGhoul2Instance( *CL_G2Map_GetG2FromHandle(g2From), *CL_G2Map_GetG2FromHandle(g2To), modelIndex );
 }
 
-static void CL_G2API_CopySpecificGhoul2Model( void *g2From, int modelFrom, void *g2To, int modelTo ) {
+template<bool qvm>
+static void CL_G2API_CopySpecificGhoul2Model(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type g2From, int modelFrom, typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type g2To, int modelTo ) {
 	if ( !g2From || !g2To) return;
-	re->G2API_CopySpecificG2Model( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)g2From)), modelFrom, *(CL_G2Map_GetG2FromHandle((g2handleptr_t)g2To)), modelTo );
+	re->G2API_CopySpecificG2Model( *CL_G2Map_GetG2FromHandle(g2From), modelFrom, *CL_G2Map_GetG2FromHandle(g2To), modelTo );
 }
 
-static void CL_G2API_DuplicateGhoul2Instance( void *g2From, void **g2To ) {
+template<bool qvm>
+static void CL_G2API_DuplicateGhoul2Instance(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type g2FromHandle, typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type g2ToHandlePtr ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 0;
 #endif
-	if ( !g2From || !g2To ) return;
-	CGhoul2Info_v **g2ToPtr = CL_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)g2To );
-	re->G2API_DuplicateGhoul2Instance( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)g2From)), g2ToPtr );
-	CL_G2Map_Update( (g2handleptr_t*)g2To, *g2ToPtr );
+	if ( !g2FromHandle || !g2ToHandlePtr ) return;
+	CGhoul2Info_v *g2To = CL_G2Map_GetG2FromHandle( *g2ToHandlePtr );
+	re->G2API_DuplicateGhoul2Instance( *CL_G2Map_GetG2FromHandle(g2FromHandle), &g2To );
+	CL_G2Map_Update( g2ToHandlePtr, g2To );
 }
 
-static qboolean CL_G2API_HasGhoul2ModelOnIndex( void *ghlInfo, int modelIndex ) {
-	CGhoul2Info_v **g2Ptr = CL_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghlInfo );
-	qboolean ret = re->G2API_HasGhoul2ModelOnIndex( g2Ptr, modelIndex );
-	CL_G2Map_Update( (g2handleptr_t*)ghlInfo, *g2Ptr );
+template<bool qvm>
+static qboolean CL_G2API_HasGhoul2ModelOnIndex(typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type ghlInfo, int modelIndex ) {
+	CGhoul2Info_v *g2 = CL_G2Map_GetG2FromHandle( *ghlInfo );
+	qboolean ret = re->G2API_HasGhoul2ModelOnIndex( &g2, modelIndex );
+	CL_G2Map_Update( ghlInfo, g2 );
 	return ret;
 }
 
-static qboolean CL_G2API_RemoveGhoul2Model( void *ghlInfo, int modelIndex ) {
+template<bool qvm>
+static qboolean CL_G2API_RemoveGhoul2Model(typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type ghlInfo, int modelIndex ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 0;
 #endif
-	CGhoul2Info_v **g2Ptr = CL_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghlInfo );
-	qboolean ret = re->G2API_RemoveGhoul2Model( g2Ptr, modelIndex );
-	CL_G2Map_Update( (g2handleptr_t*)ghlInfo, *g2Ptr );
+	assert(ghlInfo);
+	CGhoul2Info_v *g2 = CL_G2Map_GetG2PtrFromHandle( *ghlInfo );
+	qboolean ret = re->G2API_RemoveGhoul2Model( &g2, modelIndex );
+	CL_G2Map_Update( ghlInfo, g2 );
 	return ret;
 }
 
-static qboolean CL_G2API_SkinlessModel( void *ghlInfo, int modelIndex ) {
+template<bool qvm>
+static qboolean CL_G2API_SkinlessModel(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghlInfo, int modelIndex ) {
 	if ( !ghlInfo ) return qfalse;
 
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghlInfo));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghlInfo);
 	return re->G2API_SkinlessModel( g2, modelIndex );
 }
 
-static int CL_G2API_GetNumGoreMarks( void *ghlInfo, int modelIndex ) {
+template<bool qvm>
+static int CL_G2API_GetNumGoreMarks(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghlInfo, int modelIndex ) {
 #ifdef _G2_GORE
 	if ( !ghlInfo ) return 0;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghlInfo));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghlInfo);
 	return re->G2API_GetNumGoreMarks( g2, modelIndex );
 #else
 	return 0;
 #endif
 }
 
-static void CL_G2API_AddSkinGore( void *ghlInfo, SSkinGoreData *gore ) {
+template<bool qvm>
+static void CL_G2API_AddSkinGore(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghlInfo, SSkinGoreData *gore ) {
 #ifdef _G2_GORE
 	if ( !ghlInfo ) return;
-	re->G2API_AddSkinGore( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghlInfo)), *(SSkinGoreData *)gore );
+	re->G2API_AddSkinGore( *CL_G2Map_GetG2FromHandle(ghlInfo), *(SSkinGoreData *)gore );
 #endif
 }
 
-static void CL_G2API_ClearSkinGore( void *ghlInfo ) {
+template<bool qvm>
+static void CL_G2API_ClearSkinGore(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghlInfo ) {
 #ifdef _G2_GORE
 	if ( !ghlInfo ) return;
-	re->G2API_ClearSkinGore( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghlInfo)) );
+	re->G2API_ClearSkinGore( *CL_G2Map_GetG2FromHandle(ghlInfo) );
 #endif
 }
 
-static int CL_G2API_Ghoul2Size( void *ghlInfo ) {
+template<bool qvm>
+static int CL_G2API_Ghoul2Size(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghlInfo ) {
 	if ( !ghlInfo ) return 0;
-	return re->G2API_Ghoul2Size( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghlInfo)) );
+	return re->G2API_Ghoul2Size( *CL_G2Map_GetG2FromHandle(ghlInfo) );
 }
 
-static int CL_G2API_AddBolt( void *ghoul2, int modelIndex, const char *boneName ) {
+template<bool qvm>
+static int CL_G2API_AddBolt(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int modelIndex, const char *boneName ) {
 	if ( !ghoul2 ) return -1;
-	return re->G2API_AddBolt( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boneName );
+	return re->G2API_AddBolt( *CL_G2Map_GetG2FromHandle(ghoul2), modelIndex, boneName );
 }
 
-static qboolean CL_G2API_AttachEnt( int *boltInfo, void *ghlInfoTo, int toBoltIndex, int entNum, int toModelNum ) {
+template<bool qvm>
+static qboolean CL_G2API_AttachEnt( int *boltInfo, typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghlInfoTo, int toBoltIndex, int entNum, int toModelNum ) {
 	if ( !ghlInfoTo ) return qfalse;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghlInfoTo));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghlInfoTo);
 	return re->G2API_AttachEnt( boltInfo, g2, 0, toBoltIndex, entNum, toModelNum );
 }
 
-static void CL_G2API_SetBoltInfo( void *ghoul2, int modelIndex, int boltInfo ) {
+template<bool qvm>
+static void CL_G2API_SetBoltInfo(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int modelIndex, int boltInfo ) {
 	if ( !ghoul2 ) return;
-	re->G2API_SetBoltInfo( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boltInfo );
+	re->G2API_SetBoltInfo( *CL_G2Map_GetG2FromHandle(ghoul2), modelIndex, boltInfo );
 }
 
-static qboolean CL_G2API_SetRootSurface( void *ghoul2, const int modelIndex, const char *surfaceName ) {
+template<bool qvm>
+static qboolean CL_G2API_SetRootSurface(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type, const int modelIndex, const char *surfaceName ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_SetRootSurface( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, surfaceName );
+	return re->G2API_SetRootSurface( *CL_G2Map_GetG2FromHandle(ghoul2), modelIndex, surfaceName );
 }
 
-static qboolean CL_G2API_SetSurfaceOnOff( void *ghoul2, const char *surfaceName, const int flags ) {
+template<bool qvm>
+static qboolean CL_G2API_SetSurfaceOnOff(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *surfaceName, const int flags ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_SetSurfaceOnOff( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), surfaceName, flags );
+	return re->G2API_SetSurfaceOnOff( *CL_G2Map_GetG2FromHandle(ghoul2), surfaceName, flags );
 }
 
-static qboolean CL_G2API_SetNewOrigin( void *ghoul2, const int boltIndex ) {
+template<bool qvm>
+static qboolean CL_G2API_SetNewOrigin(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const int boltIndex ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_SetNewOrigin( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), boltIndex );
+	return re->G2API_SetNewOrigin( *CL_G2Map_GetG2FromHandle(ghoul2), boltIndex );
 }
 
-static qboolean CL_G2API_DoesBoneExist( void *ghoul2, int modelIndex, const char *boneName ) {
+template<bool qvm>
+static qboolean CL_G2API_DoesBoneExist(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int modelIndex, const char *boneName ) {
 	if ( !ghoul2 ) return qfalse;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghoul2);
 	return re->G2API_DoesBoneExist( g2, modelIndex, boneName );
 }
 
-static int CL_G2API_GetSurfaceRenderStatus( void *ghoul2, const int modelIndex, const char *surfaceName ) {
+template<bool qvm>
+static int CL_G2API_GetSurfaceRenderStatus(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const int modelIndex, const char *surfaceName ) {
 	if ( !ghoul2 ) return -1;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghoul2);
 	return re->G2API_GetSurfaceRenderStatus( g2, modelIndex, surfaceName );
 }
 
@@ -866,18 +893,20 @@ static void CL_G2API_SetTime( int time, int clock ) {
 	re->G2API_SetTime( time, clock );
 }
 
-static void CL_G2API_AbsurdSmoothing( void *ghoul2, qboolean status ) {
+template<bool qvm>
+static void CL_G2API_AbsurdSmoothing(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, qboolean status ) {
 	if ( !ghoul2 ) return;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghoul2);
 	re->G2API_AbsurdSmoothing( g2, status );
 }
 
-static void CL_G2API_SetRagDoll( void *ghoul2, sharedRagDollParams_t *params ) {
+template<bool qvm>
+static void CL_G2API_SetRagDoll(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, sharedRagDollParams_t *params ) {
 	if ( !ghoul2 ) return;
 
 	CRagDollParams rdParams;
 	if ( !params ) {
-		re->G2API_ResetRagDoll( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)) );
+		re->G2API_ResetRagDoll( *CL_G2Map_GetG2FromHandle(ghoul2) );
 		return;
 	}
 
@@ -900,10 +929,11 @@ static void CL_G2API_SetRagDoll( void *ghoul2, sharedRagDollParams_t *params ) {
 	rdParams.RagPhase = (CRagDollParams::ERagPhase)params->RagPhase;
 	rdParams.effectorsToTurnOff = (CRagDollParams::ERagEffector)params->effectorsToTurnOff;
 
-	re->G2API_SetRagDoll( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), &rdParams );
+	re->G2API_SetRagDoll( *CL_G2Map_GetG2FromHandle(ghoul2), &rdParams );
 }
 
-static void CL_G2API_AnimateG2Models( void *ghoul2, int time, sharedRagDollUpdateParams_t *params ) {
+template<bool qvm>
+static void CL_G2API_AnimateG2Models(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int time, sharedRagDollUpdateParams_t *params ) {
 	if ( !ghoul2 ) return;
 	if ( !params ) return;
 
@@ -916,58 +946,68 @@ static void CL_G2API_AnimateG2Models( void *ghoul2, int time, sharedRagDollUpdat
 	rduParams.me = params->me;
 	rduParams.settleFrame = params->settleFrame;
 
-	re->G2API_AnimateG2ModelsRag( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), time, &rduParams );
+	re->G2API_AnimateG2ModelsRag( *CL_G2Map_GetG2FromHandle(ghoul2), time, &rduParams );
 }
 
-static qboolean CL_G2API_RagPCJConstraint( void *ghoul2, const char *boneName, vec3_t min, vec3_t max ) {
+template<bool qvm>
+static qboolean CL_G2API_RagPCJConstraint(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, vec3_t min, vec3_t max ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_RagPCJConstraint( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), boneName, min, max );
+	return re->G2API_RagPCJConstraint( *CL_G2Map_GetG2FromHandle(ghoul2), boneName, min, max );
 }
 
-static qboolean CL_G2API_RagPCJGradientSpeed( void *ghoul2, const char *boneName, const float speed ) {
+template<bool qvm>
+static qboolean CL_G2API_RagPCJGradientSpeed(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, const float speed ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_RagPCJGradientSpeed( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), boneName, speed );
+	return re->G2API_RagPCJGradientSpeed( *CL_G2Map_GetG2FromHandle(ghoul2), boneName, speed );
 }
 
-static qboolean CL_G2API_RagEffectorGoal( void *ghoul2, const char *boneName, vec3_t pos ) {
+template<bool qvm>
+static qboolean CL_G2API_RagEffectorGoal(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, vec3_t pos ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_RagEffectorGoal( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), boneName, pos );
+	return re->G2API_RagEffectorGoal( *CL_G2Map_GetG2FromHandle(ghoul2), boneName, pos );
 }
 
-static qboolean CL_G2API_GetRagBonePos( void *ghoul2, const char *boneName, vec3_t pos, vec3_t entAngles, vec3_t entPos, vec3_t entScale ) {
+template<bool qvm>
+static qboolean CL_G2API_GetRagBonePos(typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, vec3_t pos, vec3_t entAngles, vec3_t entPos, vec3_t entScale ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_GetRagBonePos( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), boneName, pos, entAngles, entPos, entScale );
+	return re->G2API_GetRagBonePos( *CL_G2Map_GetG2FromHandle(ghoul2), boneName, pos, entAngles, entPos, entScale );
 }
 
-static qboolean CL_G2API_RagEffectorKick( void *ghoul2, const char *boneName, vec3_t velocity ) {
+template<bool qvm>
+static qboolean CL_G2API_RagEffectorKick( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, vec3_t velocity ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_RagEffectorKick( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), boneName, velocity );
+	return re->G2API_RagEffectorKick( *CL_G2Map_GetG2FromHandle(ghoul2), boneName, velocity );
 }
 
-static qboolean CL_G2API_RagForceSolve( void *ghoul2, qboolean force ) {
+template<bool qvm>
+static qboolean CL_G2API_RagForceSolve( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, qboolean force ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_RagForceSolve( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), force );
+	return re->G2API_RagForceSolve( *CL_G2Map_GetG2FromHandle(ghoul2), force );
 }
 
-static qboolean CL_G2API_SetBoneIKState( void *ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params ) {
+template<bool qvm>
+static qboolean CL_G2API_SetBoneIKState( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int time, const char *boneName, int ikState, sharedSetBoneIKStateParams_t *params ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_SetBoneIKState( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), time, boneName, ikState, params );
+	return re->G2API_SetBoneIKState( *CL_G2Map_GetG2FromHandle(ghoul2), time, boneName, ikState, params );
 }
 
-static qboolean CL_G2API_IKMove( void *ghoul2, int time, sharedIKMoveParams_t *params ) {
+template<bool qvm>
+static qboolean CL_G2API_IKMove( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int time, sharedIKMoveParams_t *params ) {
 	if ( !ghoul2 ) return qfalse;
-	return re->G2API_IKMove( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), time, params );
+	return re->G2API_IKMove( *CL_G2Map_GetG2FromHandle(ghoul2), time, params );
 }
 
-static qboolean CL_G2API_RemoveBone( void *ghoul2, const char *boneName, int modelIndex ) {
+template<bool qvm>
+static qboolean CL_G2API_RemoveBone( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, const char *boneName, int modelIndex ) {
 	if ( !ghoul2 ) return qfalse;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghoul2);
 	return re->G2API_RemoveBone( g2, modelIndex, boneName );
 }
 
-static void CL_G2API_AttachInstanceToEntNum( void *ghoul2, int entityNum, qboolean server ) {
+template<bool qvm>
+static void CL_G2API_AttachInstanceToEntNum( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int entityNum, qboolean server ) {
 	if ( !ghoul2 ) return;
-	re->G2API_AttachInstanceToEntNum( *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), entityNum, server );
+	re->G2API_AttachInstanceToEntNum( *CL_G2Map_GetG2FromHandle(ghoul2), entityNum, server );
 }
 
 static void CL_G2API_ClearAttachedInstance( int entityNum ) {
@@ -978,15 +1018,17 @@ static void CL_G2API_CleanEntAttachments( void ) {
 	re->G2API_CleanEntAttachments();
 }
 
-static qboolean CL_G2API_OverrideServer( void *serverInstance ) {
+template<bool qvm>
+static qboolean CL_G2API_OverrideServer( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type serverInstance ) {
 	if ( !serverInstance ) return qfalse;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)serverInstance));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(serverInstance);
 	return re->G2API_OverrideServerWithClientData( g2, 0 );
 }
 
-static void CL_G2API_GetSurfaceName( void *ghoul2, int surfNumber, int modelIndex, char *fillBuf ) {
+template<bool qvm>
+static void CL_G2API_GetSurfaceName( typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type ghoul2, int surfNumber, int modelIndex, char *fillBuf ) {
 	if ( !ghoul2 ) return;
-	CGhoul2Info_v &g2 = *(CL_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2));
+	CGhoul2Info_v &g2 = *CL_G2Map_GetG2FromHandle(ghoul2);
 	char *tmp = re->G2API_GetSurfaceName( g2, modelIndex, surfNumber );
 	strcpy( fillBuf, tmp );
 }
@@ -1006,6 +1048,7 @@ static void CGVM_Cmd_RemoveCommand( const char *cmd_name ) {
 
 // legacy syscall
 
+template<bool qvm>
 intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 	switch ( args[0] ) {
 		//rww - alright, DO NOT EVER add a GAME/CGAME/UI generic call without adding a trap to match, and
@@ -1317,7 +1360,7 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case CG_R_ADDREFENTITYTOSCENE:
-		CL_R_AddRefEntityToScene( (const refEntity_t *)VMA(1) );
+		CL_R_AddRefEntityToScene<qvm>( (const refEntity_t *)VMA(1) );
 		return 0;
 
 	case CG_R_ADDPOLYTOSCENE:
@@ -1561,7 +1604,7 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case CG_FX_PLAY_BOLTED_EFFECT_ID:
-		return CGFX_PlayBoltedEffectID( args[1], (float *)VMA(2), (void *)args[3], args[4], args[5], args[6], args[7], (qboolean)args[8] );
+		return CGFX_PlayBoltedEffectID<qvm>( args[1], (float *)VMA(2), (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[3], args[4], args[5], args[6], args[7], (qboolean)args[8] );
 
 	case CG_FX_ADD_SCHEDULED_EFFECTS:
 		FX_AddScheduledEffects((qboolean)args[1]);
@@ -1657,113 +1700,113 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case CG_G2_HAVEWEGHOULMODELS:
-		return CL_G2API_HaveWeGhoul2Models( (void*)args[1] );
+		return CL_G2API_HaveWeGhoul2Models<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1] );
 
 	case CG_G2_SETMODELS:
-		CL_G2API_SetGhoul2ModelIndexes( (void*)args[1], (qhandle_t *)VMA(2), (qhandle_t *)VMA(3) );
+		CL_G2API_SetGhoul2ModelIndexes<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (qhandle_t *)VMA(2), (qhandle_t *)VMA(3) );
 		return 0;
 
 	case CG_G2_GETBOLT:
-		return CL_G2API_GetBoltMatrix((void*)args[1], args[2], args[3], (mdxaBone_t *)VMA(4), (const float *)VMA(5),(const float *)VMA(6), args[7], (qhandle_t *)VMA(8), (float *)VMA(9));
+		return CL_G2API_GetBoltMatrix<qvm>((typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], args[3], (mdxaBone_t *)VMA(4), (const float *)VMA(5),(const float *)VMA(6), args[7], (qhandle_t *)VMA(8), (float *)VMA(9));
 
 	case CG_G2_GETBOLT_NOREC:
-		return CL_G2API_GetBoltMatrix_NoReconstruct((void*)args[1], args[2], args[3], (mdxaBone_t *)VMA(4), (const float *)VMA(5),(const float *)VMA(6), args[7], (qhandle_t *)VMA(8), (float *)VMA(9));
+		return CL_G2API_GetBoltMatrix_NoReconstruct<qvm>((typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], args[3], (mdxaBone_t *)VMA(4), (const float *)VMA(5),(const float *)VMA(6), args[7], (qhandle_t *)VMA(8), (float *)VMA(9));
 
 	case CG_G2_GETBOLT_NOREC_NOROT:
-		return CL_G2API_GetBoltMatrix_NoRecNoRot((void*)args[1], args[2], args[3], (mdxaBone_t *)VMA(4), (const float *)VMA(5),(const float *)VMA(6), args[7], (qhandle_t *)VMA(8), (float *)VMA(9));
+		return CL_G2API_GetBoltMatrix_NoRecNoRot<qvm>((typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], args[3], (mdxaBone_t *)VMA(4), (const float *)VMA(5),(const float *)VMA(6), args[7], (qhandle_t *)VMA(8), (float *)VMA(9));
 
 	case CG_G2_INITGHOUL2MODEL:
-		return CL_G2API_InitGhoul2Model((void **)VMA(1), (const char *)VMA(2), args[3], (qhandle_t) args[4], (qhandle_t) args[5], args[6], args[7]);
+		return CL_G2API_InitGhoul2Model<qvm>((typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type)VMA(1), (const char *)VMA(2), args[3], (qhandle_t) args[4], (qhandle_t) args[5], args[6], args[7]);
 
 	case CG_G2_SETSKIN:
-		return CL_G2API_SetSkin( (void*)args[1], args[2], args[3], args[4] );
+		return CL_G2API_SetSkin<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], args[3], args[4] );
 
 	case CG_G2_COLLISIONDETECT:
-		CL_G2API_CollisionDetect ( (CollisionRecord_t*)VMA(1), (void*)args[2], (const float*)VMA(3), (const float*)VMA(4), args[5], args[6], (float*)VMA(7), (float*)VMA(8), (float*)VMA(9), args[10], args[11], VMF(12) );
+		CL_G2API_CollisionDetect<qvm> ( (CollisionRecord_t*)VMA(1), (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[2], (const float*)VMA(3), (const float*)VMA(4), args[5], args[6], (float*)VMA(7), (float*)VMA(8), (float*)VMA(9), args[10], args[11], VMF(12) );
 		return 0;
 
 	case CG_G2_COLLISIONDETECTCACHE:
-		CL_G2API_CollisionDetectCache ( (CollisionRecord_t*)VMA(1), (void*)args[2], (const float*)VMA(3), (const float*)VMA(4), args[5], args[6], (float*)VMA(7), (float*)VMA(8), (float*)VMA(9), args[10], args[11], VMF(12) );
+		CL_G2API_CollisionDetectCache<qvm> ( (CollisionRecord_t*)VMA(1), (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[2], (const float*)VMA(3), (const float*)VMA(4), args[5], args[6], (float*)VMA(7), (float*)VMA(8), (float*)VMA(9), args[10], args[11], VMF(12) );
 		return 0;
 
 	case CG_G2_ANGLEOVERRIDE:
-		return CL_G2API_SetBoneAngles( (void*)args[1], args[2], (const char *)VMA(3), (float *)VMA(4), args[5], args[6], args[7], args[8], (qhandle_t *)VMA(9), args[10], args[11] );
+		return CL_G2API_SetBoneAngles<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (const char *)VMA(3), (float *)VMA(4), args[5], args[6], args[7], args[8], (qhandle_t *)VMA(9), args[10], args[11] );
 
 	case CG_G2_CLEANMODELS:
-		CL_G2API_CleanGhoul2Models( (void **)VMA(1) );
+		CL_G2API_CleanGhoul2Models<qvm>( (typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type)VMA(1) );
 		return 0;
 
 	case CG_G2_PLAYANIM:
-		return CL_G2API_SetBoneAnim( (void*)args[1], args[2], (const char *)VMA(3), args[4], args[5], args[6], VMF(7), args[8], VMF(9), args[10] );
+		return CL_G2API_SetBoneAnim<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (const char *)VMA(3), args[4], args[5], args[6], VMF(7), args[8], VMF(9), args[10] );
 
 	case CG_G2_GETBONEANIM:
-		return CL_G2API_GetBoneAnim( (void*)args[1], (const char *)VMA(2), args[3], (float *)VMA(4), (int *)VMA(5), (int *)VMA(6), (int *)VMA(7), (float *)VMA(8), (int *)VMA(9), args[10] );
+		return CL_G2API_GetBoneAnim<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), args[3], (float *)VMA(4), (int *)VMA(5), (int *)VMA(6), (int *)VMA(7), (float *)VMA(8), (int *)VMA(9), args[10] );
 
 	case CG_G2_GETBONEFRAME:
-		return CL_G2API_GetBoneFrame( (void*)args[1], (const char*)VMA(2), args[3], (float *)VMA(4), (int *)VMA(5), args[6] );
+		return CL_G2API_GetBoneFrame<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char*)VMA(2), args[3], (float *)VMA(4), (int *)VMA(5), args[6] );
 
 	case CG_G2_GETGLANAME:
-		CL_G2API_GetGLAName( (void*)args[1], args[2], (char *)VMA(3) );
+		CL_G2API_GetGLAName<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (char *)VMA(3) );
 		return 0;
 
 	case CG_G2_COPYGHOUL2INSTANCE:
-		return CL_G2API_CopyGhoul2Instance( (void*)args[1], (void*)args[2], args[3] );
+		return CL_G2API_CopyGhoul2Instance<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[2], args[3] );
 
 	case CG_G2_COPYSPECIFICGHOUL2MODEL:
-		CL_G2API_CopySpecificGhoul2Model( (void*)args[1], args[2], (void*)args[3], args[4] );
+		CL_G2API_CopySpecificGhoul2Model<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[3], args[4] );
 		return 0;
 
 	case CG_G2_DUPLICATEGHOUL2INSTANCE:
-		CL_G2API_DuplicateGhoul2Instance( (void*)args[1], (void **)VMA(2) );
+		CL_G2API_DuplicateGhoul2Instance<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type)VMA(2) );
 		return 0;
 
 	case CG_G2_HASGHOUL2MODELONINDEX:
-		return CL_G2API_HasGhoul2ModelOnIndex( VMA(1), args[2]);
+		return CL_G2API_HasGhoul2ModelOnIndex<qvm>( (typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type)VMA(1), args[2]);
 
 	case CG_G2_REMOVEGHOUL2MODEL:
-		return CL_G2API_RemoveGhoul2Model( VMA(1), args[2]);
+		return CL_G2API_RemoveGhoul2Model<qvm>( (typename std::conditional<qvm, g2handle_t*, CGhoul2Info_v**>::type)VMA(1), args[2]);
 
 	case CG_G2_SKINLESSMODEL:
-		return CL_G2API_SkinlessModel( (void*)args[1], args[2] );
+		return CL_G2API_SkinlessModel<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2] );
 
 	case CG_G2_GETNUMGOREMARKS:
-		return CL_G2API_GetNumGoreMarks( (void*)args[1], args[2] );
+		return CL_G2API_GetNumGoreMarks<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2] );
 
 	case CG_G2_ADDSKINGORE:
-		CL_G2API_AddSkinGore( (void*)args[1], (SSkinGoreData *)VMA(2));
+		CL_G2API_AddSkinGore<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (SSkinGoreData *)VMA(2));
 		return 0;
 
 	case CG_G2_CLEARSKINGORE:
-		CL_G2API_ClearSkinGore ( (void*)args[1] );
+		CL_G2API_ClearSkinGore<qvm> ( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1] );
 		return 0;
 
 	case CG_G2_SIZE:
-		return CL_G2API_Ghoul2Size ( (void*)args[1] );
+		return CL_G2API_Ghoul2Size<qvm> ( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1] );
 
 	case CG_G2_ADDBOLT:
-		return CL_G2API_AddBolt( (void*)args[1], args[2], (const char *)VMA(3));
+		return CL_G2API_AddBolt<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (const char *)VMA(3));
 
 	case CG_G2_ATTACHENT:
-		return CL_G2API_AttachEnt( (int*)VMA(1), (void*)args[2], args[3], args[4], args[5] );
+		return CL_G2API_AttachEnt<qvm>( (int*)VMA(1), (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[2], args[3], args[4], args[5] );
 
 	case CG_G2_SETBOLTON:
-		CL_G2API_SetBoltInfo( (void*)args[1], args[2], args[3] );
+		CL_G2API_SetBoltInfo<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], args[3] );
 		return 0;
 
 	case CG_G2_SETROOTSURFACE:
-		return CL_G2API_SetRootSurface( (void*)args[1], args[2], (const char *)VMA(3));
+		return CL_G2API_SetRootSurface<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (const char *)VMA(3));
 
 	case CG_G2_SETSURFACEONOFF:
-		return CL_G2API_SetSurfaceOnOff( (void*)args[1], (const char *)VMA(2), args[3]);
+		return CL_G2API_SetSurfaceOnOff<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), args[3]);
 
 	case CG_G2_SETNEWORIGIN:
-		return CL_G2API_SetNewOrigin( (void*)args[1], args[2]);
+		return CL_G2API_SetNewOrigin<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2]);
 
 	case CG_G2_DOESBONEEXIST:
-		return CL_G2API_DoesBoneExist( (void*)args[1], args[2], (const char *)VMA(3));
+		return CL_G2API_DoesBoneExist<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (const char *)VMA(3));
 
 	case CG_G2_GETSURFACERENDERSTATUS:
-		return CL_G2API_GetSurfaceRenderStatus( (void*)args[1], args[2], (const char *)VMA(3));
+		return CL_G2API_GetSurfaceRenderStatus<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (const char *)VMA(3));
 
 	case CG_G2_GETTIME:
 		return CL_G2API_GetTime();
@@ -1773,48 +1816,48 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case CG_G2_ABSURDSMOOTHING:
-		CL_G2API_AbsurdSmoothing( (void*)args[1], (qboolean)args[2]);
+		CL_G2API_AbsurdSmoothing<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (qboolean)args[2]);
 		return 0;
 
 
 	case CG_G2_SETRAGDOLL:
-		CL_G2API_SetRagDoll( (void*)args[1], (sharedRagDollParams_t *)VMA(2) );
+		CL_G2API_SetRagDoll<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (sharedRagDollParams_t *)VMA(2) );
 		return 0;
 
 	case CG_G2_ANIMATEG2MODELS:
-		CL_G2API_AnimateG2Models( (void*)args[1], args[2], (sharedRagDollUpdateParams_t *)VMA(3) );
+		CL_G2API_AnimateG2Models<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (sharedRagDollUpdateParams_t *)VMA(3) );
 		return 0;
 
 		//additional ragdoll options -rww
 	case CG_G2_RAGPCJCONSTRAINT:
-		return CL_G2API_RagPCJConstraint( (void*)args[1], (const char *)VMA(2), (float *)VMA(3), (float *)VMA(4));
+		return CL_G2API_RagPCJConstraint<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), (float *)VMA(3), (float *)VMA(4));
 
 	case CG_G2_RAGPCJGRADIENTSPEED:
-		return CL_G2API_RagPCJGradientSpeed( (void*)args[1], (const char *)VMA(2), VMF(3));
+		return CL_G2API_RagPCJGradientSpeed<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), VMF(3));
 
 	case CG_G2_RAGEFFECTORGOAL:
-		return CL_G2API_RagEffectorGoal( (void*)args[1], (const char *)VMA(2), (float *)VMA(3));
+		return CL_G2API_RagEffectorGoal<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), (float *)VMA(3));
 
 	case CG_G2_GETRAGBONEPOS:
-		return CL_G2API_GetRagBonePos( (void*)args[1], (const char *)VMA(2), (float *)VMA(3), (float *)VMA(4), (float *)VMA(5), (float *)VMA(6));
+		return CL_G2API_GetRagBonePos<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), (float *)VMA(3), (float *)VMA(4), (float *)VMA(5), (float *)VMA(6));
 
 	case CG_G2_RAGEFFECTORKICK:
-		return CL_G2API_RagEffectorKick( (void*)args[1], (const char *)VMA(2), (float *)VMA(3));
+		return CL_G2API_RagEffectorKick<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), (float *)VMA(3));
 
 	case CG_G2_RAGFORCESOLVE:
-		return CL_G2API_RagForceSolve( (void*)args[1], (qboolean)args[2]);
+		return CL_G2API_RagForceSolve<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (qboolean)args[2]);
 
 	case CG_G2_SETBONEIKSTATE:
-		return CL_G2API_SetBoneIKState( (void*)args[1], args[2], (const char *)VMA(3), args[4], (sharedSetBoneIKStateParams_t *)VMA(5));
+		return CL_G2API_SetBoneIKState<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (const char *)VMA(3), args[4], (sharedSetBoneIKStateParams_t *)VMA(5));
 
 	case CG_G2_IKMOVE:
-		return CL_G2API_IKMove( (void*)args[1], args[2], (sharedIKMoveParams_t *)VMA(3));
+		return CL_G2API_IKMove<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (sharedIKMoveParams_t *)VMA(3));
 
 	case CG_G2_REMOVEBONE:
-		return CL_G2API_RemoveBone( (void*)args[1], (const char *)VMA(2), args[3] );
+		return CL_G2API_RemoveBone<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], (const char *)VMA(2), args[3] );
 
 	case CG_G2_ATTACHINSTANCETOENTNUM:
-		CL_G2API_AttachInstanceToEntNum( (void*)args[1], args[2], (qboolean)args[3]);
+		CL_G2API_AttachInstanceToEntNum<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], (qboolean)args[3]);
 		return 0;
 
 	case CG_G2_CLEARATTACHEDINSTANCE:
@@ -1826,10 +1869,10 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case CG_G2_OVERRIDESERVER:
-		return CL_G2API_OverrideServer( (void*)args[1] );
+		return CL_G2API_OverrideServer<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1] );
 
 	case CG_G2_GETSURFACENAME:
-		CL_G2API_GetSurfaceName( (void*)args[1], args[2], args[3], (char *)VMA(4) );
+		CL_G2API_GetSurfaceName<qvm>( (typename std::conditional<qvm, g2handle_t, CGhoul2Info_v*>::type)args[1], args[2], args[3], (char *)VMA(4) );
 		return 0;
 
 	case CG_SP_GETSTRINGTEXTSTRING:
@@ -1869,6 +1912,43 @@ intptr_t CL_CgameSystemCalls( intptr_t *args ) {
 
 // Stub function for old RMG system.
 static void RE_InitRendererTerrain ( const char * /*info*/ ) {}
+
+// We need to translate our nice type-safe CGoul2Info_v*-receiving functions into void* to satisfy the ABI.
+
+template<typename Arg>
+using TranslatedG2Arg = typename std::conditional<
+	// translate CGhoul2Info_v* to void*
+	std::is_same<Arg, CGhoul2Info_v*>::value, void*,
+	// translate CGhoul2Info_v** to void** & keep everything else as-is
+	typename std::conditional<std::is_same<Arg, CGhoul2Info_v**>::value, void**, Arg>::type
+>::type;
+
+template<typename Arg> constexpr bool IsTranslatedG2Arg = !std::is_same<Arg, TranslatedG2Arg<Arg>>::value;
+
+template<typename Arg>
+Arg TranslateG2Arg(typename std::enable_if<!IsTranslatedG2Arg<Arg>, Arg>::type arg) {
+	return arg;
+}
+template<typename Arg>
+Arg TranslateG2Arg(typename std::enable_if<IsTranslatedG2Arg<Arg>, TranslatedG2Arg<Arg>>::type arg) {
+	return reinterpret_cast<Arg>(arg);
+}
+
+template<typename F, typename TF> struct TranslateG2ArgsImpl;
+template<typename F, typename Ret, typename... Args>
+struct TranslateG2ArgsImpl<F, Ret(Args...)> {
+	static Ret func(typename TranslatedG2Arg<Args>... args) {
+		return F(TranslateG2Arg<Args>(args)...);
+	}
+};
+
+template<typename F> using TranslateG2Args = typename TranslateG2ArgsImpl<F, decltype(F)>;
+
+class CGhoul2Info_v;
+static void UserdataReceiver(CGhoul2Info_v* userdata) {}
+void (*wrapped) (void* userdata) = TranslateG2Args<UserdataReceiver>::func;
+void (*wrapped2) (void* userdata) = TranslateG2ArgsImpl<UserdataReceiver, decltype(UserdataReceiver)>::func;
+void (*wrapped3) (void* userdata) = TranslateG2ArgsImpl<UserdataReceiver, decltype(&UserdataReceiver)>::func;
 
 void CL_BindCGame( void ) {
 	static cgameImport_t cgi;
@@ -1940,7 +2020,7 @@ void CL_BindCGame( void ) {
 		cgi.R_AddDecalToScene					= re->AddDecalToScene;
 		cgi.R_AddLightToScene					= re->AddLightToScene;
 		cgi.R_AddPolysToScene					= re->AddPolyToScene;
-		cgi.R_AddRefEntityToScene				= CL_R_AddRefEntityToScene;
+		cgi.R_AddRefEntityToScene				= CL_R_AddRefEntityToScene<false>;
 		cgi.R_AnyLanguage_ReadCharFromString	= re->AnyLanguage_ReadCharFromString;
 		cgi.R_AutomapElevationAdjustment		= re->AutomapElevationAdjustment;
 		cgi.R_ClearDecals						= re->ClearDecals;
@@ -2008,11 +2088,18 @@ void CL_BindCGame( void ) {
 		cgi.CIN_SetExtents						= CIN_SetExtents;
 		cgi.CIN_StopCinematic					= CIN_StopCinematic;
 		cgi.FX_AddLine							= CGFX_AddLine;
+		cgi.FX_AddLine							= TranslateG2Args<CGFX_AddLine>::func;
+		cgi.FX_AddLine							= TranslateG2Args<&CGFX_AddLine>::func;
+		cgi.FX_AddLine							= TranslateG2ArgsImpl<CGFX_AddLine, decltype(CGFX_AddLine)>::func;
+		cgi.FX_AddLine							= TranslateG2ArgsImpl<&CGFX_AddLine, decltype(&CGFX_AddLine)>::func;
 		cgi.FX_RegisterEffect					= FX_RegisterEffect;
 		cgi.FX_PlayEffect						= FX_PlayEffect;
 		cgi.FX_PlayEffectID						= FX_PlayEffectID;
 		cgi.FX_PlayEntityEffectID				= FX_PlayEntityEffectID;
-		cgi.FX_PlayBoltedEffectID				= CGFX_PlayBoltedEffectID;
+		cgi.FX_PlayBoltedEffectID				= TranslateG2Args<CGFX_PlayBoltedEffectID<false>>::func;
+		cgi.FX_PlayBoltedEffectID				= TranslateG2Args<&CGFX_PlayBoltedEffectID<false>>::func;
+		cgi.FX_PlayBoltedEffectID				= TranslateG2ArgsImpl<CGFX_PlayBoltedEffectID<false>, decltype(CGFX_PlayBoltedEffectID<false>)>::func;
+		cgi.FX_PlayBoltedEffectID				= TranslateG2ArgsImpl<&CGFX_PlayBoltedEffectID<false>, decltype(&CGFX_PlayBoltedEffectID<false>)>::func;
 		cgi.FX_AddScheduledEffects				= FX_AddScheduledEffects;
 		cgi.FX_InitSystem						= FX_InitSystem;
 		cgi.FX_SetRefDef						= FX_SetRefDef;
@@ -2030,6 +2117,7 @@ void CL_BindCGame( void ) {
 		cgi.ROFF_Cache							= CL_ROFF_Cache;
 		cgi.ROFF_Play							= CL_ROFF_Play;
 		cgi.ROFF_Purge_Ent						= CL_ROFF_Purge_Ent;
+		/*
 		cgi.G2_ListModelSurfaces				= CL_G2API_ListModelSurfaces;
 		cgi.G2_ListModelBones					= CL_G2API_ListModelBones;
 		cgi.G2_SetGhoul2ModelIndexes			= CL_G2API_SetGhoul2ModelIndexes;
@@ -2084,6 +2172,7 @@ void CL_BindCGame( void ) {
 		cgi.G2API_CleanEntAttachments			= CL_G2API_CleanEntAttachments;
 		cgi.G2API_OverrideServer				= CL_G2API_OverrideServer;
 		cgi.G2API_GetSurfaceName				= CL_G2API_GetSurfaceName;
+		*/
 
 		cgi.ext.R_Font_StrLenPixels				= re->ext.Font_StrLenPixels;
 
@@ -2100,7 +2189,7 @@ void CL_BindCGame( void ) {
 	}
 
 	// fall back to legacy syscall/vm_call api
-	cgvm = VM_CreateLegacy( VM_CGAME, CL_CgameSystemCalls );
+	cgvm = VM_CreateLegacy( VM_CGAME, CL_CgameSystemCalls<false>, CL_CgameSystemCalls<true> );
 	if ( !cgvm ) {
 		cls.cgameStarted = qfalse;
 		Com_Error( ERR_DROP, "VM_CreateLegacy on cgame failed" );

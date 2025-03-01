@@ -3411,7 +3411,7 @@ void SV_BindGame( void ) {
 	}
 
 	// fall back to legacy syscall/vm_call api
-	gvm = VM_CreateLegacy( VM_GAME, SV_GameSystemCalls );
+	gvm = VM_CreateLegacy( VM_GAME, SV_GameSystemCalls, SV_GameSystemCalls );
 	if ( !gvm ) {
 		svs.gameStarted = qfalse;
 		Com_Error( ERR_DROP, "VM_CreateLegacy on game failed" );
