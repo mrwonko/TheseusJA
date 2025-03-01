@@ -302,7 +302,7 @@ typedef struct sharedEntityMapper_s {
 #else
 	struct Vehicle_s		**m_pVehicle; //vehicle data
 #endif
-	void			**ghoul2; //g2 instance
+	void			**ghoul2; //g2 instance - CGhoul2Info_v** in native, g2handle_t** in QVM; resolve via SV_EntityMapperReadGhoul2 & sv_g2Mapping
 	int				*localAnimIndex; //index locally (game/cgame) to anim data for this skel
 	vec3_t			*modelScale; //needed for g2 collision
 

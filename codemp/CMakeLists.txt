@@ -227,6 +227,8 @@ if(BuildMPEngine OR BuildMPDed)
 		"${MPDir}/qcommon/cvar.cpp"
 		"${MPDir}/qcommon/disablewarnings.h"
 		"${MPDir}/qcommon/files.cpp"
+		"${MPDir}/qcommon/g2_handle_mapper.h"
+		"${MPDir}/qcommon/g2_handle_mapper.cpp"
 		"${MPDir}/qcommon/game_version.h"
 		"${MPDir}/qcommon/GenericParser2.cpp"
 		"${MPDir}/qcommon/GenericParser2.h"
