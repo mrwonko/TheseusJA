@@ -152,6 +152,8 @@ typedef union fileBuffer_u {
 } fileBuffer_t;
 
 typedef int32_t qhandle_t, thandle_t, fxHandle_t, sfxHandle_t, fileHandle_t, clipHandle_t, g2handle_t;
+// In QVMs, this is an opaque numeric g2handle_t, while in native modules, it's a CGhoul2Info_v*
+// (which modules are not _supposed_ to inspect, but conceivably might...)
 typedef intptr_t g2handleptr_t;
 
 #define NULL_HANDLE ((qhandle_t)0)

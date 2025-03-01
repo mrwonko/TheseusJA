@@ -59,23 +59,6 @@ CGhoul2Info_v *SV_G2Map_GetG2FromHandle( g2handleptr_t g2h )
 	return g2Mapping[g2handle];
 }
 
- CGhoul2Info_v **SV_G2Map_GetG2PtrFromHandle( g2handleptr_t *g2h )
-{ // Returns a pointer to the g2 object pointer in the map so g2 functions can update the pointer
-	// Native libraries should not use the pointer, but in theory they could use
-	// it. Thus we don't perform any mapping for native libraries to avoid
-	// issues with custom modules.
-	if ( gvm->dllHandle ) return (CGhoul2Info_v **)g2h;
-
-	g2handle_t g2handle = *((g2handle_t*)g2h);
-	if ( !g2handle )
-	{ // Special case: the g2 handle is not valid, yet. Return a pointer to a static temporary pointer. Insertion is handled by calling SV_G2Map_Update after calling the G2API
-		static CGhoul2Info_v *g2Tmp;
-		g2Tmp = NULL;
-		return &g2Tmp;
-	}
-	return &g2Mapping[g2handle];
-}
-
 void SV_G2Map_Update( g2handleptr_t *g2h, CGhoul2Info_v *g2Ptr )
 { // Inserts and/or erases to/from the map and updates the handle pointer
 	if ( gvm->dllHandle ) return;
@@ -1729,13 +1712,15 @@ static qboolean SV_G2API_GetBoltMatrix_NoRecNoRot( void *ghoul2, const int model
 	return re->G2API_GetBoltMatrix( *(SV_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), modelIndex, boltIndex, matrix, angles, position, frameNum, modelList, scale );
 }
 
-static int SV_G2API_InitGhoul2Model( void **ghoul2Ptr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias ) {
+static int SV_G2API_InitGhoul2Model( void **rawG2HandlePtr, const char *fileName, int modelIndex, qhandle_t customSkin, qhandle_t customShader, int modelFlags, int lodBias ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 1;
 #endif
-	CGhoul2Info_v **g2Ptr = SV_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghoul2Ptr );
-	int ret = re->G2API_InitGhoul2Model( g2Ptr, fileName, modelIndex, customSkin, customShader, modelFlags, lodBias );
-	SV_G2Map_Update( (g2handleptr_t*)ghoul2Ptr, *g2Ptr );
+	g2handleptr_t* g2HandlePtr = reinterpret_cast<g2handleptr_t*>(rawG2HandlePtr);
+	assert(g2HandlePtr);
+	CGhoul2Info_v *g2 = SV_G2Map_GetG2FromHandle( *g2HandlePtr );
+	int ret = re->G2API_InitGhoul2Model( &g2, fileName, modelIndex, customSkin, customShader, modelFlags, lodBias );
+	SV_G2Map_Update( g2HandlePtr, g2 );
 	return ret;
 }
 
@@ -1755,14 +1740,15 @@ static void SV_G2API_CollisionDetectCache( CollisionRecord_t *collRecMap, void* 
 	re->G2API_CollisionDetectCache( collRecMap, *(SV_G2Map_GetG2FromHandle((g2handleptr_t)ghoul2)), angles, position, frameNumber, entNum, rayStart, rayEnd, scale, G2VertSpaceServer, traceFlags, useLod, fRadius );
 }
 
-static void SV_G2API_CleanGhoul2Models( void **ghoul2Ptr ) {
+static void SV_G2API_CleanGhoul2Models( void **rawG2HandlePtr ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 1;
 #endif
-
-	CGhoul2Info_v **g2Ptr = SV_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghoul2Ptr );
-	re->G2API_CleanGhoul2Models( g2Ptr );
-	SV_G2Map_Update( (g2handleptr_t*)ghoul2Ptr, *g2Ptr );
+	g2handleptr_t* g2HandlePtr = reinterpret_cast<g2handleptr_t*>(rawG2HandlePtr);
+	assert(g2HandlePtr);
+	CGhoul2Info_v *g2 = SV_G2Map_GetG2FromHandle( *g2HandlePtr );
+	re->G2API_CleanGhoul2Models( &g2 );
+	SV_G2Map_Update( g2HandlePtr, g2 );
 }
 
 static qboolean SV_G2API_SetBoneAngles( void *ghoul2, int modelIndex, const char *boneName, const vec3_t angles, const int flags, const int up, const int right, const int forward, qhandle_t *modelList, int blendTime , int currentTime ) {
@@ -1805,41 +1791,52 @@ static void SV_G2API_CopySpecificGhoul2Model( void *g2From, int modelFrom, void 
 	re->G2API_CopySpecificG2Model( *(SV_G2Map_GetG2FromHandle((g2handleptr_t)g2From)), modelFrom, *(SV_G2Map_GetG2FromHandle((g2handleptr_t)g2To)), modelTo );
 }
 
-static void SV_G2API_DuplicateGhoul2Instance( void *g2From, void **g2To ) {
+static void SV_G2API_DuplicateGhoul2Instance( void *rawG2HandleFrom, void **rawG2HandlePtrTo ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 1;
 #endif
-	if ( !g2From || !g2To ) return;
+	g2handleptr_t g2HandleFrom = reinterpret_cast<g2handleptr_t>(rawG2HandleFrom);
+	g2handleptr_t* g2HandlePtrTo = reinterpret_cast<g2handleptr_t*>(rawG2HandlePtrTo);
+	if ( !g2HandleFrom || !g2HandlePtrTo ) return;
 
-	CGhoul2Info_v **g2ToPtr = SV_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)g2To );
-	re->G2API_DuplicateGhoul2Instance( *(SV_G2Map_GetG2FromHandle((g2handleptr_t)g2From)), g2ToPtr );
-	SV_G2Map_Update( (g2handleptr_t*)g2To, *g2ToPtr );
+	CGhoul2Info_v *g2 = SV_G2Map_GetG2FromHandle( *g2HandlePtrTo );
+	re->G2API_DuplicateGhoul2Instance( *SV_G2Map_GetG2FromHandle(g2HandleFrom), &g2 );
+	SV_G2Map_Update( g2HandlePtrTo, g2 );
 }
 
+// FIXME: shouldn't ghlInfo be a void**?
 static qboolean SV_G2API_HasGhoul2ModelOnIndex( void *ghlInfo, int modelIndex ) {
-	CGhoul2Info_v **g2Ptr = SV_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghlInfo );
-	qboolean ret = re->G2API_HasGhoul2ModelOnIndex( g2Ptr, modelIndex );
-	SV_G2Map_Update( (g2handleptr_t*)ghlInfo, *g2Ptr );
+	g2handleptr_t* g2HandlePtr = reinterpret_cast<g2handleptr_t*>(ghlInfo);
+	assert(g2HandlePtr);
+	CGhoul2Info_v *g2 = SV_G2Map_GetG2FromHandle( *g2HandlePtr );
+	qboolean ret = re->G2API_HasGhoul2ModelOnIndex( &g2, modelIndex );
+	SV_G2Map_Update( g2HandlePtr, g2 );
 	return ret;
 }
 
+// FIXME: shouldn't ghlInfo be a void**?
 static qboolean SV_G2API_RemoveGhoul2Model( void *ghlInfo, int modelIndex ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 		g_G2AllocServer = 1;
 #endif
-	CGhoul2Info_v **g2Ptr = SV_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghlInfo );
-	qboolean ret = re->G2API_RemoveGhoul2Model( g2Ptr, modelIndex );
-	SV_G2Map_Update( (g2handleptr_t*)ghlInfo, *g2Ptr );
+	g2handleptr_t* g2HandlePtr = reinterpret_cast<g2handleptr_t*>(ghlInfo);
+	assert(g2HandlePtr);
+	CGhoul2Info_v *g2 = SV_G2Map_GetG2FromHandle( *g2HandlePtr );
+	qboolean ret = re->G2API_RemoveGhoul2Model( &g2, modelIndex );
+	SV_G2Map_Update( g2HandlePtr, g2 );
 	return ret;
 }
 
+// FIXME: shouldn't ghlInfo be a void**?
 static qboolean SV_G2API_RemoveGhoul2Models( void *ghlInfo ) {
 #ifdef _FULL_G2_LEAK_CHECKING
 	g_G2AllocServer = 1;
 #endif
-	CGhoul2Info_v **g2Ptr = SV_G2Map_GetG2PtrFromHandle( (g2handleptr_t*)ghlInfo );
-	qboolean ret = re->G2API_RemoveGhoul2Models( g2Ptr );
-	SV_G2Map_Update( (g2handleptr_t*)ghlInfo, *g2Ptr );
+	g2handleptr_t* g2HandlePtr = reinterpret_cast<g2handleptr_t*>(ghlInfo);
+	assert(g2HandlePtr);
+	CGhoul2Info_v *g2 = SV_G2Map_GetG2FromHandle( *g2HandlePtr );
+	qboolean ret = re->G2API_RemoveGhoul2Models( &g2 );
+	SV_G2Map_Update( g2HandlePtr, g2 );
 	return ret;
 }
 
