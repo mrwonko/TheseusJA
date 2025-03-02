@@ -25,6 +25,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include "qcommon/q_shared.h"
 #include "qcommon/qcommon.h"
+#include "qcommon/safe/limited_vector.h"
 #include "game/g_public.h"
 #include "game/bg_public.h"
 #include "rd-common/tr_public.h"
@@ -69,6 +70,7 @@ typedef struct server_s {
 	char			*entityParsePoint;	// used during game VM init
 
 	sharedEntityMapper_t gentitiesMapper[MAX_GENTITIES];
+	Q::LimitedVector<sharedEntityMapper2_t, MAX_GENTITIES> gentitiesMapper2;
 
 	// the game virtual machine will update these on init and changes
 	sharedEntity_t	*gentities;

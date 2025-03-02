@@ -583,12 +583,14 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 	int i, j;
 	int entCount = Com_Clampi( 0, ARRAY_LEN(sv.gentitiesMapper), sv.num_entities );
 	sharedEntityMapper_t *entM;
+	sv.gentitiesMapper2.clear();
 
 	if ( gvm->dllHandle ) {
 		sharedEntity_t *ent;
 		for ( i = 0; i < entCount; i++ ) {
 			// Get the shared entity and the mapper
 			ent = (sharedEntity_t *)((byte *)sv.gentities + sv.gentitySize*(i));
+			sv.gentitiesMapper2.emplace_back(ent);
 			entM = &sv.gentitiesMapper[i];
 
 			// Assign all values
@@ -623,6 +625,7 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 		for ( i = 0; i < entCount; i++ ) {
 			// Get the shared entity and the mapper
 			ent = (sharedEntity_qvm_t *)((byte *)sv.gentities + sv.gentitySize*(i));
+			sv.gentitiesMapper2.emplace_back(ent);
 			entM = &sv.gentitiesMapper[i];
 
 			// Assign all values
@@ -658,6 +661,38 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 		}
 	}
 }
+
+sharedEntityMapper2_s::sharedEntityMapper2_s(sharedEntity_t* ent)
+	: s(ent->s)
+	, playerState(ent->playerState)
+	, m_pVehicle(ent->m_pVehicle)
+	, ghoul2(ent->ghoul2)
+	, localAnimIndex(ent->localAnimIndex)
+	, modelScale(ent->modelScale)
+	, r(ent->r)
+	, taskID(ent->taskID)
+	, parms(ent->parms)
+	, behaviorSet(ent->behaviorSet)
+	, script_targetname(ent->script_targetname)
+	, delayScriptTime(ent->delayScriptTime)
+	, fullName(ent->fullName)
+	, targetname(ent->targetname)
+	, classname(ent->classname)
+	, waypoint(ent->waypoint)
+	, lastWaypoint(ent->lastWaypoint)
+	, lastValidWaypoint(ent->lastValidWaypoint)
+	, noWaypointTime(ent->noWaypointTime)
+	, combatPoint(ent->combatPoint)
+	, failedWaypoints(ent->failedWaypoints)
+	, failedWaypointCheckTime(ent->failedWaypointCheckTime)
+	, next_roff_time(ent->next_roff_time)
+{}
+
+// TODO qvm-equivalent for sharedEntityMapper2_s(sharedEntity_qvm_t * ent)
+// but that won't work for behaviorSet because each element needs to be reinterpreted individually
+// and also this hides the necessity to use the SV_EntityMapperRead* functions
+// so I'm abandoning this approach and will attempt to use smart references instead,
+// something akin to std::reference_wrapper.
 
 #define ENTITYMAP_READER( type, funcName ) \
 	type funcName( type *inPtr ) { \

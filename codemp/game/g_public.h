@@ -334,6 +334,53 @@ typedef struct sharedEntityMapper_s {
 	int				*next_roff_time; //rww - npc's need to know when they're getting roff'd
 } sharedEntityMapper_t;
 
+typedef struct sharedEntityMapper2_s {
+	// Create a mapping for a native entity.
+	sharedEntityMapper2_s(sharedEntity_t* ent);
+	// Create a mapping for a qvm entity.
+	sharedEntityMapper2_s(sharedEntity_qvm_t* ent);
+
+	entityState_t& s;				// communicated by server to clients
+	playerState_t*& playerState;	//needs to be in the gentity for bg entity access
+	//if you want to actually see the contents I guess
+	//you will have to be sure to VMA it first.
+#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
+	Vehicle_t*& m_pVehicle; //vehicle data
+#else
+	struct Vehicle_s*& m_pVehicle; //vehicle data
+#endif
+	void*& ghoul2; //g2 instance
+	int& localAnimIndex; //index locally (game/cgame) to anim data for this skel
+	vec3_t& modelScale; //needed for g2 collision
+
+	//from here up must also be unified with bgEntity/centity
+
+	entityShared_t& r;				// shared by both the server system and game
+
+	//Script/ICARUS-related fields
+	int				(&taskID)[NUM_TIDS];
+	parms_t*& parms;
+	char* (&behaviorSet)[NUM_BSETS];
+	char*& script_targetname;
+	int& delayScriptTime;
+	char*& fullName;
+
+	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
+	char*& targetname;
+	char*& classname;			// set in QuakeEd
+
+	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
+	int& waypoint;			//Set once per frame, if you've moved, and if someone asks
+	int& lastWaypoint;		//To make sure you don't double-back
+	int& lastValidWaypoint;	//ALWAYS valid -used for tracking someone you lost
+	int& noWaypointTime;		//Debouncer - so don't keep checking every waypoint in existance every frame that you can't find one
+	int& combatPoint;
+	int				(&failedWaypoints)[MAX_FAILED_NODES];
+	int& failedWaypointCheckTime;
+
+	int& next_roff_time; //rww - npc's need to know when they're getting roff'd
+} sharedEntityMapper2_t;
+
 #if !defined(_GAME) && defined(__cplusplus)
 class CSequencer;
 class CTaskManager;
