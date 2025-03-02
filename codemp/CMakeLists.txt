@@ -273,6 +273,8 @@ if(BuildMPEngine OR BuildMPDed)
 		"${SharedDir}/qcommon/safe/files.cpp"
 		"${SharedDir}/qcommon/safe/files.h"
 		"${SharedDir}/qcommon/safe/gsl.h"
+		"${SharedDir}/qcommon/safe/limited_vector.cpp"
+		"${SharedDir}/qcommon/safe/limited_vector.h"
 		)
 	source_group("common/safe" FILES ${MPEngineAndDedCommonSafeFiles})
 	set(MPEngineAndDedFiles ${MPEngineAndDedFiles} ${MPEngineAndDedCommonSafeFiles})
