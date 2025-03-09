@@ -180,7 +180,7 @@ struct gentity_s {
 	playerState_t	*playerState;	//ptr to playerstate if applicable (for bg ents)
 	Vehicle_t		*m_pVehicle; //vehicle data
 	void			*ghoul2; //g2 instance
-	int				localAnimIndex; //index locally (game/cgame) to anim data for this skel
+	int32_t			localAnimIndex; //index locally (game/cgame) to anim data for this skel
 	vec3_t			modelScale; //needed for g2 collision
 
 	//From here up must be the same as centity_t/bgEntity_t
@@ -188,11 +188,11 @@ struct gentity_s {
 	entityShared_t	r;				// shared by both the server system and game
 
 	//rww - these are shared icarus things. They must be in this order as well in relation to the entityshared structure.
-	int				taskID[NUM_TIDS];
+	int32_t			taskID[NUM_TIDS];
 	parms_t			*parms;
 	char			*behaviorSet[NUM_BSETS];
 	char			*script_targetname;
-	int				delayScriptTime;
+	int32_t			delayScriptTime;
 	char			*fullName;
 
 	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
@@ -200,18 +200,20 @@ struct gentity_s {
 	char			*classname;			// set in QuakeEd
 
 	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
-	int				waypoint;			//Set once per frame, if you've moved, and if someone asks
-	int				lastWaypoint;		//To make sure you don't double-back
-	int				lastValidWaypoint;	//ALWAYS valid -used for tracking someone you lost
-	int				noWaypointTime;		//Debouncer - so don't keep checking every waypoint in existance every frame that you can't find one
-	int				combatPoint;
-	int				failedWaypoints[MAX_FAILED_NODES];
-	int				failedWaypointCheckTime;
+	int32_t			waypoint;			//Set once per frame, if you've moved, and if someone asks
+	int32_t			lastWaypoint;		//To make sure you don't double-back
+	int32_t			lastValidWaypoint;	//ALWAYS valid -used for tracking someone you lost
+	int32_t			noWaypointTime;		//Debouncer - so don't keep checking every waypoint in existance every frame that you can't find one
+	int32_t			combatPoint;
+	int32_t			failedWaypoints[MAX_FAILED_NODES];
+	int32_t			failedWaypointCheckTime;
 
-	int				next_roff_time; //rww - npc's need to know when they're getting roff'd
+	int32_t			next_roff_time; //rww - npc's need to know when they're getting roff'd
 
 	// DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER
 	// EXPECTS THE FIELDS IN THAT ORDER!
+	// THEY MUST MATCH sharedEntity_t IN THE ENGINE
+	// AND CHANGING ANYTHING WOULD BREAK MODULE COMPATIBILITY!
 	//================================
 
 	struct gclient_s	*client;			// NULL if not a client
