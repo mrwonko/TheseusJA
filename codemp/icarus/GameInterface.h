@@ -38,20 +38,26 @@ typedef std::map < std::string, pscript_t* >	bufferlist_t;
 extern	interface_export_t	interface_export;
 
 extern	void Interface_Init( interface_export_t *pe );
-extern	int ICARUS_RunScript( sharedEntityMapper_t *ent, const char *name );
+template<ModuleContext Ctx>
+extern	int ICARUS_RunScript( sharedEntityMapper_t<Ctx> *ent, const char *name );
 extern	bool ICARUS_RegisterScript( const char *name, qboolean bCalledDuringInterrogate = qfalse);
 extern ICARUS_Instance	*iICARUS;
 extern bufferlist_t		ICARUS_BufferList;
 extern entlist_t		ICARUS_EntList;
 
 //
-//	g_ICARUS.cpp
+//	GameInterface.cpp
 //
 void ICARUS_Init( void );
-bool ICARUS_ValidEnt( sharedEntityMapper_t *ent );
-void ICARUS_InitEnt( sharedEntityMapper_t *ent );
-void ICARUS_FreeEnt( sharedEntityMapper_t *ent );
-void ICARUS_AssociateEnt( sharedEntityMapper_t *ent );
+template<ModuleContext Ctx>
+bool ICARUS_ValidEnt( sharedEntityMapper_t<Ctx> *ent );
+template<ModuleContext Ctx>
+void ICARUS_InitEnt( sharedEntityMapper_t<Ctx> *ent );
+template<ModuleContext Ctx>
+void ICARUS_FreeEnt( sharedEntityMapper_t<Ctx> *ent );
+template<ModuleContext Ctx>
+void ICARUS_AssociateEnt( sharedEntityMapper_t<Ctx> *ent );
+template<ModuleContext Ctx>
 void ICARUS_Shutdown( void );
 void Svcmd_ICARUS_f( void );
 

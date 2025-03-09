@@ -213,7 +213,7 @@ typedef struct Vehicle_s Vehicle_t;
 // This opaque handle is used by the engine to access the shared entity data.
 // Modules should treat this pointer as opaque, only the engine needs to understand it.
 // When modules want to inspect entities, they should use gentity_t instead.
-// The engine definition is in server/server.h
+// The engine definition is in server/server.h (sharedEntity_native_t / sharedEntity_qvm_t)
 typedef struct sharedEntity_s sharedEntity_t;
 
 #if !defined(_GAME) && defined(__cplusplus)
@@ -766,7 +766,7 @@ typedef struct gameImport_s {
 	qboolean	(*InPVS)								( const vec3_t p1, const vec3_t p2 );
 	qboolean	(*InPVSIgnorePortals)					( const vec3_t p1, const vec3_t p2 );
 	void		(*LinkEntity)							( sharedEntity_t *ent );
-	void		(*LocateGameData)						( sharedEntity_t *gEnts, int numGEntities, int sizeofGEntity_t, playerState_t *clients, int sizeofGClient );
+	void		(*LocateGameData)						( void *gEnts, int numGEntities, int sizeofGEntity_t, playerState_t *clients, int sizeofGClient );
 	int			(*PointContents)						( const vec3_t point, int passEntityNum );
 	void		(*SendConsoleCommand)					( int exec_when, const char *text );
 	void		(*SendServerCommand)					( int clientNum, const char *text );

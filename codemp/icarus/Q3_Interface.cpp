@@ -124,9 +124,10 @@ void Q3_TaskIDClear( int *taskID )
 qboolean Q3_TaskIDPending( sharedEntityMapper_t *ent, taskID_t taskType )
 -------------------------
 */
-qboolean Q3_TaskIDPending( sharedEntityMapper_t *ent, taskID_t taskType )
+template <ModuleContext Ctx>
+qboolean Q3_TaskIDPending( sharedEntityMapper_t<Ctx> *ent, taskID_t taskType )
 {
-	if ( !gSequencers[ent->s->number] || !gTaskManagers[ent->s->number] )
+	if ( !gSequencers[ent->s.number] || !gTaskManagers[ent->s.number] )
 	{
 		return qfalse;
 	}
@@ -136,37 +137,40 @@ qboolean Q3_TaskIDPending( sharedEntityMapper_t *ent, taskID_t taskType )
 		return qfalse;
 	}
 
-	if ( (*(ent->taskID))[taskType] >= 0 )//-1 is none
+	if ( ent->taskID[taskType] >= 0 )//-1 is none
 	{
 		return qtrue;
 	}
 
 	return qfalse;
 }
+template qboolean Q3_TaskIDPending<ModuleContext::Native>(sharedEntityMapper_t<ModuleContext::Native>* ent, taskID_t taskType);
+template qboolean Q3_TaskIDPending<ModuleContext::QVM>(sharedEntityMapper_t<ModuleContext::QVM>* ent, taskID_t taskType);
 
 /*
 -------------------------
 void Q3_TaskIDComplete( sharedEntityMapper_t *ent, taskID_t taskType )
 -------------------------
 */
-void Q3_TaskIDComplete( sharedEntityMapper_t *ent, taskID_t taskType )
+template <ModuleContext Ctx>
+void Q3_TaskIDComplete( sharedEntityMapper_t<Ctx> *ent, taskID_t taskType )
 {
 	if ( taskType < TID_CHAN_VOICE || taskType >= NUM_TIDS )
 	{
 		return;
 	}
 
-	if ( gTaskManagers[ent->s->number] && Q3_TaskIDPending( ent, taskType ) )
+	if ( gTaskManagers[ent->s.number] && Q3_TaskIDPending( ent, taskType ) )
 	{//Complete it
-		gTaskManagers[ent->s->number]->Completed( (*(ent->taskID))[taskType] );
+		gTaskManagers[ent->s.number]->Completed( ent->taskID[taskType] );
 
 		//See if any other tasks have the name number and clear them so we don't complete more than once
-		int	clearTask = (*(ent->taskID))[taskType];
+		int	clearTask = ent->taskID[taskType];
 		for ( int tid = 0; tid < NUM_TIDS; tid++ )
 		{
-			if ( (*(ent->taskID))[tid] == clearTask )
+			if ( ent->taskID[tid] == clearTask )
 			{
-				Q3_TaskIDClear( &((*(ent->taskID))[tid]) );
+				Q3_TaskIDClear( &ent->taskID[tid] );
 			}
 		}
 
@@ -175,6 +179,8 @@ void Q3_TaskIDComplete( sharedEntityMapper_t *ent, taskID_t taskType )
 	}
 	//otherwise, wasn't waiting for a task to complete anyway
 }
+template void Q3_TaskIDComplete<ModuleContext::Native>(sharedEntityMapper_t<ModuleContext::Native>* ent, taskID_t taskType);
+template void Q3_TaskIDComplete<ModuleContext::QVM>(sharedEntityMapper_t<ModuleContext::QVM>* ent, taskID_t taskType);
 
 /*
 -------------------------
@@ -182,7 +188,8 @@ void Q3_SetTaskID( sharedEntityMapper_t *ent, taskID_t taskType, int taskID )
 -------------------------
 */
 
-void Q3_TaskIDSet( sharedEntityMapper_t *ent, taskID_t taskType, int taskID )
+template <ModuleContext Ctx>
+void Q3_TaskIDSet( sharedEntityMapper_t<Ctx> *ent, taskID_t taskType, int taskID )
 {
 	if ( taskType < TID_CHAN_VOICE || taskType >= NUM_TIDS )
 	{
@@ -192,8 +199,10 @@ void Q3_TaskIDSet( sharedEntityMapper_t *ent, taskID_t taskType, int taskID )
 	//Might be stomping an old task, so complete and clear previous task if there was one
 	Q3_TaskIDComplete( ent, taskType );
 
-	(*(ent->taskID))[taskType] = taskID;
+	ent->taskID[taskType] = taskID;
 }
+template void Q3_TaskIDSet<ModuleContext::Native>(sharedEntityMapper_t<ModuleContext::Native>* ent, taskID_t taskType, int taskID);
+template void Q3_TaskIDSet<ModuleContext::QVM>(sharedEntityMapper_t<ModuleContext::QVM>* ent, taskID_t taskType, int taskID);
 
 
 /*
@@ -236,9 +245,10 @@ Q3_GetEntityByName
 Returns the sequencer of the entity by the given name
 =============
 */
-static sharedEntityMapper_t *Q3_GetEntityByName( const char *name )
+template<ModuleContext Ctx>
+static sharedEntityMapper_t<Ctx> *Q3_GetEntityByName( const char *name )
 {
-	sharedEntityMapper_t				*ent;
+	sharedEntityMapper_t<Ctx>				*ent;
 	entlist_t::iterator		ei;
 	char					temp[1024];
 
@@ -253,7 +263,7 @@ static sharedEntityMapper_t *Q3_GetEntityByName( const char *name )
 	if ( ei == ICARUS_EntList.end() )
 		return NULL;
 
-	ent = SV_GentityMapperNum((*ei).second);
+	ent = SV_GentityNum<Ctx>((*ei).second);
 
 	return ent;
 	// this now returns the ent instead of the sequencer -- dmv 06/27/01
@@ -261,6 +271,8 @@ static sharedEntityMapper_t *Q3_GetEntityByName( const char *name )
 //		return NULL;
 //	return gSequencers[ent->s->number];
 }
+template sharedEntityMapper_t<ModuleContext::Native>* Q3_GetEntityByName<ModuleContext::Native>(const char* name);
+template sharedEntityMapper_t<ModuleContext::QVM>* Q3_GetEntityByName<ModuleContext::QVM>(const char* name);
 
 /*
 =============
@@ -693,8 +705,11 @@ void Q3_DebugPrint( int level, const char *format, ... )
 
 				if ( ( entNum < 0 ) || ( entNum >= MAX_GENTITIES ) )
 					entNum = 0;
-
-				Com_Printf ( S_COLOR_BLUE"DEBUG: %s(%d): %s\n", SV_EntityMapperReadString(SV_GentityMapperNum(entNum)->script_targetname), entNum, buffer );
+				
+				char* script_targetname = SV_UsesQVM()
+					? SV_GentityNum<ModuleContext::QVM>(entNum)->script_targetname
+					: SV_GentityNum<ModuleContext::Native>(entNum)->script_targetname;
+				Com_Printf ( S_COLOR_BLUE"DEBUG: %s(%d): %s\n", script_targetname, entNum, buffer );
 				break;
 			}
 		default:
@@ -975,7 +990,8 @@ void Interface_Init( interface_export_t *pe )
 	pe->I_LoadFile				=	Q3_ReadScript;
 	pe->I_CenterPrint			=	Q3_CenterPrint;
 	pe->I_DPrintf				=	Q3_DebugPrint;
-	pe->I_GetEntityByName		=	Q3_GetEntityByName;
+	pe->I_GetNativeEntityByName	=	Q3_GetEntityByName<ModuleContext::Native>;
+	pe->I_GetQVMEntityByName	=	Q3_GetEntityByName<ModuleContext::QVM>;
 	pe->I_GetTime				=	Q3_GetTime;
 	pe->I_GetTimeScale			=	Q3_GetTimeScale;
 	pe->I_PlaySound				=	Q3_PlaySound;

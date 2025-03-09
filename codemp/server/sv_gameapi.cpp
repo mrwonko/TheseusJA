@@ -46,8 +46,8 @@ static_assert(sizeof(entityShared_t) == 112, "entityShared_t is part of the modu
 static_assert(sizeof(parms_t) == 1024, "parms_t is part of the module ABI and must not change in size or layout");
 static_assert(sizeof(sharedEntity_qvm_t) == 864, "sharedEntity_qvm_t is part of the module ABI and must not change in size or layout");
 // sharedEntity_t contains pointers, so its layout differs between 32 and 64 bit
-static_assert(sizeof(void*) == 4 ? sizeof(sharedEntity_t) == 864 : true, "sharedEntity_t is part of the module ABI and must not change in size or layout in 32 bit");
-static_assert(sizeof(void*) == 8 ? sizeof(sharedEntity_t) == 976 : true, "sharedEntity_t is part of the module ABI and must not change in size or layout in 64 bit");
+static_assert(sizeof(void*) == 4 ? sizeof(sharedEntity_native_t) == 864 : true, "sharedEntity_t is part of the module ABI and must not change in size or layout in 32 bit");
+static_assert(sizeof(void*) == 8 ? sizeof(sharedEntity_native_t) == 976 : true, "sharedEntity_t is part of the module ABI and must not change in size or layout in 64 bit");
 static_assert(sizeof(siegePers_t) == 12, "siegePers_t is part of the module ABI and must not change in size or layout");
 
 botlib_export_t	*botlib_export;
@@ -61,6 +61,19 @@ typedef std::unordered_map<g2handle_t, CGhoul2Info_v*> g2HandleToG2_m;
 static g2HandleToG2_m g2Mapping;
 static g2handle_t g2NextHandle = (g2handle_t)1; // Start at 1, because 0 has special meaning
 
+qboolean SV_UsesQVM() {
+	return static_cast<qboolean>(gvm != nullptr && !gvm->dllHandle);
+}
+
+// Only for use in QVM context. If the handle could come from a native module, use SV_G2Map_GetG2FromHandle instead.
+CGhoul2Info_v* SV_G2Map_GetG2FromQVMHandle(g2handle_t g2handle)
+{
+	g2HandleToG2_m::iterator ghlIt = g2Mapping.find(g2handle);
+
+	if (ghlIt == g2Mapping.end()) return NULL;
+	return ghlIt->second;
+}
+
 CGhoul2Info_v *SV_G2Map_GetG2FromHandle( g2handleptr_t g2h )
 { // Returns the pointer to the g2 object if the handle is valid
 	// Native libraries should not use the pointer, but in theory they could use
@@ -68,11 +81,8 @@ CGhoul2Info_v *SV_G2Map_GetG2FromHandle( g2handleptr_t g2h )
 	// issues with custom modules.
 	if ( gvm->dllHandle ) return (CGhoul2Info_v*)g2h;
 
+	return SV_G2Map_GetG2FromQVMHandle((g2handle_t)g2h);
 	g2handle_t g2handle = (g2handle_t)g2h;
-	g2HandleToG2_m::iterator ghlIt = g2Mapping.find(g2handle);
-
-	if (ghlIt == g2Mapping.end()) return NULL;
-	return g2Mapping[g2handle];
 }
 
 void SV_G2Map_Update( g2handleptr_t *g2h, CGhoul2Info_v *g2Ptr )
@@ -567,9 +577,12 @@ int CM_ModelContents( clipHandle_t model, int subBSPIndex );
 int CM_LoadSubBSP( const char *name, qboolean clientload );
 int CM_FindSubBSP( int modelIndex );
 char *CM_SubBSPEntityString( int index );
-qboolean Q3_TaskIDPending( sharedEntityMapper_t *ent, taskID_t taskType );
-void Q3_TaskIDSet( sharedEntityMapper_t *ent, taskID_t taskType, int taskID );
-void Q3_TaskIDComplete( sharedEntityMapper_t *ent, taskID_t taskType );
+template <ModuleContext Ctx>
+qboolean Q3_TaskIDPending( sharedEntityMapper_t<Ctx> *ent, taskID_t taskType );
+template <ModuleContext Ctx>
+void Q3_TaskIDSet( sharedEntityMapper_t<Ctx> *ent, taskID_t taskType, int taskID );
+template <ModuleContext Ctx>
+void Q3_TaskIDComplete( sharedEntityMapper_t<Ctx> *ent, taskID_t taskType );
 void Q3_SetVar( int taskID, int entID, const char *type_name, const char *data );
 int Q3_VariableDeclared( const char *name );
 int Q3_GetFloatVariable( const char *name, float *value );
@@ -578,124 +591,15 @@ int Q3_GetVectorVariable( const char *name, vec3_t value );
 void SV_BotWaypointReception( int wpnum, wpobject_t **wps );
 void SV_BotCalculatePaths( int rmg );
 
-static void SV_UpdateSharedEntitiesMapping( void ) {
-	int i, j;
-	int entCount = Com_Clampi( 0, ARRAY_LEN(sv.gentitiesMapper), sv.num_entities );
-	sharedEntityMapper_t *entM;
-
-	if ( gvm->dllHandle ) {
-		sharedEntity_t *ent;
-		for ( i = 0; i < entCount; i++ ) {
-			// Get the shared entity and the mapper
-			ent = (sharedEntity_t *)((byte *)sv.gentities + sv.gentitySize*(i));
-			entM = &sv.gentitiesMapper[i];
-
-			// Assign all values
-			entM->s                       = &ent->s;
-			entM->playerState             = &ent->playerState;
-			entM->m_pVehicle              = &ent->m_pVehicle;
-			entM->ghoul2                  = &ent->ghoul2;
-			entM->localAnimIndex          = &ent->localAnimIndex;
-			entM->modelScale              = &ent->modelScale;
-			entM->r                       = &ent->r;
-			entM->taskID                  = &ent->taskID;
-			entM->parms                   = &ent->parms;
-			for ( j = 0; j < NUM_BSETS; j++ ) {
-				entM->behaviorSet[j]      = &(ent->behaviorSet[j]);
-			}
-			entM->script_targetname       = &ent->script_targetname;
-			entM->delayScriptTime         = &ent->delayScriptTime;
-			entM->fullName                = &ent->fullName;
-			entM->targetname              = &ent->targetname;
-			entM->classname               = &ent->classname;
-			entM->waypoint                = &ent->waypoint;
-			entM->lastWaypoint            = &ent->lastWaypoint;
-			entM->lastValidWaypoint       = &ent->lastValidWaypoint;
-			entM->noWaypointTime          = &ent->noWaypointTime;
-			entM->combatPoint             = &ent->combatPoint;
-			entM->failedWaypoints         = &ent->failedWaypoints;
-			entM->failedWaypointCheckTime = &ent->failedWaypointCheckTime;
-			entM->next_roff_time          = &ent->next_roff_time;
-		}
+static void SV_LocateGameData( void *gEnts, int numGEntities, int sizeofGEntity_t, playerState_t *clients, int sizeofGameClient ) {
+	if (gvm->dllHandle) {
+		sv.gentities.native.reinit(gEnts, numGEntities, sizeofGEntity_t);
 	} else {
-		sharedEntity_qvm_t *ent;
-		for ( i = 0; i < entCount; i++ ) {
-			// Get the shared entity and the mapper
-			ent = (sharedEntity_qvm_t *)((byte *)sv.gentities + sv.gentitySize*(i));
-			entM = &sv.gentitiesMapper[i];
-
-			// Assign all values
-			entM->s                       = &ent->s;
-			entM->playerState             = (playerState_t**)&ent->playerState;
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-			entM->m_pVehicle              = (Vehicle_t**)&ent->m_pVehicle;
-#else
-			entM->m_pVehicle              = (struct Vehicle_s**)&ent->m_pVehicle;
-#endif
-			entM->ghoul2                  = (void**)&ent->ghoul2;
-			entM->localAnimIndex          = &ent->localAnimIndex;
-			entM->modelScale              = &ent->modelScale;
-			entM->r                       = &ent->r;
-			entM->taskID                  = &ent->taskID;
-			entM->parms                   = (parms_t**)&ent->parms;
-			for ( j = 0; j < NUM_BSETS; j++ ) {
-				entM->behaviorSet[j]      = (char**)&(ent->behaviorSet[j]);
-			}
-			entM->script_targetname       = (char**)&ent->script_targetname;
-			entM->delayScriptTime         = &ent->delayScriptTime;
-			entM->fullName                = (char**)&ent->fullName;
-			entM->targetname              = (char**)&ent->targetname;
-			entM->classname               = (char**)&ent->classname;
-			entM->waypoint                = &ent->waypoint;
-			entM->lastWaypoint            = &ent->lastWaypoint;
-			entM->lastValidWaypoint       = &ent->lastValidWaypoint;
-			entM->noWaypointTime          = &ent->noWaypointTime;
-			entM->combatPoint             = &ent->combatPoint;
-			entM->failedWaypoints         = &ent->failedWaypoints;
-			entM->failedWaypointCheckTime = &ent->failedWaypointCheckTime;
-			entM->next_roff_time          = &ent->next_roff_time;
-		}
+		sv.gentities.qvm.reinit(gEnts, numGEntities, sizeofGEntity_t);
 	}
-}
-
-#define ENTITYMAP_READER( type, funcName ) \
-	type funcName( type *inPtr ) { \
-		if ( gvm->dllHandle ) { \
-			return *inPtr; \
-		} else { \
-			return (type)VM_ArgPtr((intptr_t)(*(uint32_t*)inPtr)); \
-		} \
-	}
-
-ENTITYMAP_READER( char*, SV_EntityMapperReadString );
-ENTITYMAP_READER( void*, SV_EntityMapperReadData );
-ENTITYMAP_READER( playerState_t*, SV_EntityMapperReadPlayerState );
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	ENTITYMAP_READER( Vehicle_t*, SV_EntityMapperReadVehicle );
-#else
-	ENTITYMAP_READER( struct Vehicle_s*, SV_EntityMapperReadVehicle );
-#endif
-ENTITYMAP_READER( parms_t*, SV_EntityMapperReadParms );
-
-void *SV_EntityMapperReadGhoul2( void **inPtr ) {
-	if ( gvm->dllHandle ) {
-		return *inPtr;
-	} else {
-		// For QVMs the address is actually a handle we have to interpret as uint32_t
-		return (void*)(intptr_t)(*(uint32_t*)inPtr);
-	}
-}
-
-static void SV_LocateGameData( sharedEntity_t *gEnts, int numGEntities, int sizeofGEntity_t, playerState_t *clients, int sizeofGameClient ) {
-
-	sv.gentities = gEnts;
-	sv.gentitySize = sizeofGEntity_t;
-	sv.num_entities = numGEntities;
 
 	sv.gameClients = clients;
 	sv.gameClientSize = sizeofGameClient;
-
-	SV_UpdateSharedEntitiesMapping();
 }
 
 static void SV_GameDropClient( int clientNum, const char *reason ) {
@@ -918,7 +822,8 @@ static qboolean SV_ICARUS_RegisterScript( const char *name, qboolean bCalledDuri
 }
 
 static qboolean SV_ICARUS_ValidEnt( sharedEntity_t *ent ) {
-	return (qboolean)ICARUS_ValidEnt( SV_GEntityMapperForGentity(ent) );
+	assert(gvm->dllHandle);
+	return (qboolean)ICARUS_ValidEnt(reinterpret_cast<sharedEntity_native_t*>(ent));
 }
 
 static qboolean ICARUS_IsInitialized( int entID ) {
@@ -2167,7 +2072,7 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return FS_GetFileList( (const char *)VMA(1), (const char *)VMA(2), (char *)VMA(3), args[4] );
 
 	case G_LOCATE_GAME_DATA:
-		SV_LocateGameData( (sharedEntity_t *)VMA(1), args[2], args[3], (struct playerState_s *)VMA(4), args[5] );
+		SV_LocateGameData( VMA(1), args[2], args[3], (struct playerState_s *)VMA(4), args[5] );
 		return 0;
 
 	case G_DROP_CLIENT:
@@ -2322,7 +2227,9 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 
 	//rww - icarus traps
 	case G_ICARUS_RUNSCRIPT:
-		return ICARUS_RunScript(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)), (const char *)VMA(2));
+		return SV_UsesQVM()
+			? ICARUS_RunScript(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)), (const char *)VMA(2))
+			: ICARUS_RunScript(reinterpret_cast<sharedEntity_native_t*>(VMA(1)), (const char*)VMA(2));
 
 	case G_ICARUS_REGISTERSCRIPT:
 		return ICARUS_RegisterScript((const char *)VMA(1), (qboolean)args[2]);
@@ -2332,7 +2239,9 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return 0;
 
 	case G_ICARUS_VALIDENT:
-		return ICARUS_ValidEnt(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)));
+		return SV_UsesQVM()
+			? (qboolean)ICARUS_ValidEnt(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)))
+			: (qboolean)ICARUS_ValidEnt(reinterpret_cast<sharedEntity_native_t*>(VMA(1)));
 
 	case G_ICARUS_ISINITIALIZED:
 		return ICARUS_IsInitialized( args[1] );
@@ -2344,34 +2253,41 @@ intptr_t SV_GameSystemCalls( intptr_t *args ) {
 		return ICARUS_IsRunning( args[1] );
 
 	case G_ICARUS_TASKIDPENDING:
-		return Q3_TaskIDPending(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)), (taskID_t)args[2]);
+		return SV_UsesQVM()
+			? Q3_TaskIDPending(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)), (taskID_t)args[2])
+			: Q3_TaskIDPending(reinterpret_cast<sharedEntity_native_t*>(VMA(1)), (taskID_t)args[2]);
 
 	case G_ICARUS_INITENT:
-		ICARUS_InitEnt(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)));
+		if (SV_UsesQVM()) ICARUS_InitEnt(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)));
+		else ICARUS_InitEnt(reinterpret_cast<sharedEntity_native_t*>(VMA(1)));
 		return 0;
 
 	case G_ICARUS_FREEENT:
-		ICARUS_FreeEnt(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)));
+		if (SV_UsesQVM()) ICARUS_FreeEnt(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)));
+		else ICARUS_FreeEnt(reinterpret_cast<sharedEntity_native_t*>(VMA(1)));
 		return 0;
 
 	case G_ICARUS_ASSOCIATEENT:
-		ICARUS_AssociateEnt(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)));
+		if (SV_UsesQVM()) ICARUS_AssociateEnt(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)));
+		else ICARUS_AssociateEnt(reinterpret_cast<sharedEntity_native_t*>(VMA(1)));
 		return 0;
 
 	case G_ICARUS_SHUTDOWN:
-		ICARUS_Shutdown();
+		if (SV_UsesQVM()) ICARUS_Shutdown<ModuleContext::QVM>();
+		else ICARUS_Shutdown<ModuleContext::Native>();
 		return 0;
 
 	case G_ICARUS_TASKIDSET:
 		//rww - note that we are passing in the true entity here.
 		//This is because we allow modification of certain non-pointer values,
 		//which is valid.
-		Q3_TaskIDSet(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)), (taskID_t)args[2], args[3]);
+		Q3_TaskIDSet(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)), (taskID_t)args[2], args[3]);
 		return 0;
 
 	case G_ICARUS_TASKIDCOMPLETE:
 		//same as above.
-		Q3_TaskIDComplete(SV_GEntityMapperForGentity((sharedEntity_t *)VMA(1)), (taskID_t)args[2]);
+		if (SV_UsesQVM()) Q3_TaskIDComplete(reinterpret_cast<sharedEntity_qvm_t*>(VMA(1)), (taskID_t)args[2]);
+		else Q3_TaskIDComplete(reinterpret_cast<sharedEntity_native_t*>(VMA(1)), (taskID_t)args[2]);
 		return 0;
 
 	case G_ICARUS_SETVAR:
@@ -3084,8 +3000,12 @@ void SV_InitGame( qboolean restart ) {
 	// clear level pointers
 	sv.entityParsePoint = CM_EntityString();
 	for ( i=0, cl=svs.clients; i<sv_maxclients->integer; i++, cl++ ) {
-		cl->gentity = NULL;
-		cl->gentityMapper = NULL;
+		if (SV_UsesQVM()) {
+			cl->gentity.qvm = nullptr;
+		}
+		else {
+			cl->gentity.native = nullptr;
+		}
 	}
 
 	GVM_InitGame( sv.time, Com_Milliseconds(), restart );
@@ -3166,7 +3086,7 @@ void SV_BindGame( void ) {
 		gi.ICARUS_InitEnt						= SV_ICARUS_InitEnt;
 		gi.ICARUS_FreeEnt						= SV_ICARUS_FreeEnt;
 		gi.ICARUS_AssociateEnt					= SV_ICARUS_AssociateEnt;
-		gi.ICARUS_Shutdown						= ICARUS_Shutdown;
+		gi.ICARUS_Shutdown						= ICARUS_Shutdown<ModuleContext::Native>;
 		gi.ICARUS_TaskIDSet						= SV_ICARUS_TaskIDSet;
 		gi.ICARUS_TaskIDComplete				= SV_ICARUS_TaskIDComplete;
 		gi.ICARUS_SetVar						= Q3_SetVar;

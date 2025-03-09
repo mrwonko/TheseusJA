@@ -22,6 +22,8 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "server/sv_public.h"
+
 // ICARUS Interface header file
 
 typedef	float vec3_t[3];
@@ -29,15 +31,15 @@ typedef	float vec3_t[3];
 class CSequencer;
 class CTaskManager;
 
-typedef struct sharedEntityMapper_s sharedEntityMapper_t;
-
 typedef struct interface_export_s
 {
 	//General
 	int				(*I_LoadFile)( const char *name, void **buf );
 	void			(*I_CenterPrint)( const char *format, ... );
 	void			(*I_DPrintf)( int, const char *, ... );
-	sharedEntityMapper_t  *(*I_GetEntityByName)( const char *name );		//Polls the engine for the sequencer of the entity matching the name passed
+	// these two are technically mutually exclusive, but turning interface_export_t into a template with ModuleContext seems excessive.
+	sharedEntity_native_t*	(*I_GetNativeEntityByName)( const char *name );	//Polls the engine for the sequencer of the entity matching the name passed
+	sharedEntity_qvm_t*		(*I_GetQVMEntityByName)(const char* name);		//Polls the engine for the sequencer of the entity matching the name passed
 	unsigned int			(*I_GetTime)( void );							//Gets the current time
 	unsigned int			(*I_GetTimeScale)(void );
 	int 			(*I_PlaySound)( int taskID, int entID, const char *name, const char *channel );

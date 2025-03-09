@@ -35,29 +35,22 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 // these functions must be used instead of pointer arithmetic, because
 // the game allocates gentities with private information after the server shared part
-int	SV_NumForGentity( const sharedEntity_t *ent ) {
-	int		num;
-
-	num = ( (byte *)ent - (byte *)sv.gentities ) / sv.gentitySize;
-
-	return num;
+template<> int	SV_NumForGentity<ModuleContext::Native>( const sharedEntityMapper_t<ModuleContext::Native>*ent ) {
+	assert(!SV_UsesQVM());
+	return sv.gentities.native.indexOf(ent);
+}
+template<> int	SV_NumForGentity<ModuleContext::QVM>(const sharedEntityMapper_t<ModuleContext::QVM>* ent) {
+	assert(SV_UsesQVM());
+	return sv.gentities.qvm.indexOf(ent);
 }
 
-int	SV_NumForGentityMapper( const sharedEntityMapper_t *ent ) {
-	return ent - sv.gentitiesMapper;
+template<> sharedEntityMapper_t<ModuleContext::Native>* SV_GentityNum<ModuleContext::Native>( int num ) {
+	assert(!SV_UsesQVM());
+	return sv.gentities.native[num];
 }
-
-sharedEntity_t *SV_GentityNum( int num ) {
-	sharedEntity_t *ent;
-
-	ent = (sharedEntity_t *)((byte *)sv.gentities + sv.gentitySize*(num));
-
-	return ent;
-}
-
-sharedEntityMapper_t *SV_GentityMapperNum( int num ) {
-	if ( num < 0 || num >= (int)ARRAY_LEN(sv.gentitiesMapper) ) return NULL;
-	return &sv.gentitiesMapper[num];
+template<> sharedEntityMapper_t<ModuleContext::QVM>* SV_GentityNum<ModuleContext::QVM>(int num) {
+	assert(SV_UsesQVM());
+	return sv.gentities.qvm[num];
 }
 
 playerState_t *SV_GameClientNum( int num ) {
@@ -68,37 +61,28 @@ playerState_t *SV_GameClientNum( int num ) {
 	return ps;
 }
 
-svEntity_t	*SV_SvEntityForGentity( sharedEntity_t *gEnt ) {
+template<ModuleContext Ctx>
+svEntity_t	*SV_SvEntityForGentity( sharedEntityMapper_t<Ctx> *gEnt ) {
+	assert(SV_UsesQVM() == (Ctx == ModuleContext::QVM));
 	if ( !gEnt || gEnt->s.number < 0 || gEnt->s.number >= MAX_GENTITIES ) {
 		Com_Error( ERR_DROP, "SV_SvEntityForGentity: bad gEnt" );
 	}
 	return &sv.svEntities[ gEnt->s.number ];
 }
+// explicitly instantiate the template to avoid linker errors
+template svEntity_t* SV_SvEntityForGentity<ModuleContext::Native>(sharedEntityMapper_t<ModuleContext::Native>* gEnt);
+template svEntity_t* SV_SvEntityForGentity<ModuleContext::QVM>(sharedEntityMapper_t<ModuleContext::QVM>* gEnt);
 
-svEntity_t	*SV_SvEntityForGentityMapper( sharedEntityMapper_t *gEnt ) {
-	if ( !gEnt || gEnt->s->number < 0 || gEnt->s->number >= MAX_GENTITIES ) {
-		Com_Error( ERR_DROP, "SV_SvEntityForGentity: bad gEnt" );
-	}
-	return &sv.svEntities[ gEnt->s->number ];
-}
-
-sharedEntity_t *SV_GEntityForSvEntity( svEntity_t *svEnt ) {
+template<ModuleContext Ctx>
+sharedEntityMapper_t<Ctx> *SV_GEntityForSvEntity( svEntity_t *svEnt ) {
 	int		num;
 
 	num = svEnt - sv.svEntities;
-	return SV_GentityNum( num );
+	return SV_GentityNum<Ctx>( num );
 }
-
-sharedEntityMapper_t *SV_GEntityMapperForSvEntity( svEntity_t *svEnt ) {
-	int		num;
-
-	num = svEnt - sv.svEntities;
-	return SV_GentityMapperNum( num );
-}
-
-sharedEntityMapper_t *SV_GEntityMapperForGentity( const sharedEntity_t *gEnt ) {
-	return SV_GentityMapperNum( SV_NumForGentity(gEnt) );
-}
+// explicitly instantiate the template to avoid linker errors
+template sharedEntityMapper_t<ModuleContext::Native>* SV_GEntityForSvEntity<ModuleContext::Native>(svEntity_t* svEnt);
+template sharedEntityMapper_t<ModuleContext::QVM>* SV_GEntityForSvEntity<ModuleContext::QVM>(svEntity_t* svEnt);
 
 /*
 =================

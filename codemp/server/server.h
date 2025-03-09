@@ -28,6 +28,7 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 #include "game/g_public.h"
 #include "game/bg_public.h"
 #include "rd-common/tr_public.h"
+#include "server/sv_public.h"
 
 //=============================================================================
 
@@ -54,19 +55,63 @@ typedef enum {
 	SS_GAME				// actively running
 } serverState_t;
 
-// the server looks at a sharedEntity, which is the start of the game's gentity_t structure
-//mod authors should not touch this struct
-typedef struct sharedEntity_s {
+// QVMPointer transparently translates pointers into the 32 bit QVM address space to native pointers.
+template<typename T>
+class QVMPointer {
+public:
+	// implicit conversion to the wrapped pointer unwraps it (by translating the qvm address with VM_ArgPtr)
+	operator T* () const {
+		return reinterpret_cast<T*>(VM_ArgPtr(static_cast<intptr_t>(m_pointer)));
+	}
+private:
+	uint32_t m_pointer;
+};
+
+static_assert(sizeof(QVMPointer<void>) == 4, "QVM Pointers must be 32 bit");
+static_assert(std::is_trivially_constructible<QVMPointer<void>>::value, "QVM Pointers must be trivially constructible (as they just reinterpret qvm memory)");
+static_assert(std::is_trivially_destructible<QVMPointer<void>>::value, "QVM Pointers must be trivially destructible (as they are owned by the module)");
+
+CGhoul2Info_v* SV_G2Map_GetG2FromQVMHandle(g2handle_t g2handle);
+
+// Ghoul 2 objects are created and owned by the engine/renderer, not the module.
+// Subsequently their addresses don't necessarily fit into a QVM's 32 bit pointer.
+// So while native modules receive and use the real CGhoul2Info_v pointer,
+// QVM modules receive an opaque g2handle_t instead.
+// This helper type transparently converts the handle to the real pointer.
+class QVMG2Handle {
+public:
+	operator CGhoul2Info_v* () const {
+		return SV_G2Map_GetG2FromQVMHandle(m_handle);
+	}
+private:
+	g2handle_t m_handle;
+};
+
+static_assert(sizeof(QVMG2Handle) == 4, "QVM Pointers must be 32 bit");
+static_assert(std::is_trivially_constructible<QVMG2Handle>::value, "QVM Pointers must be trivially constructible (as they just reinterpret qvm memory)");
+static_assert(std::is_trivially_destructible<QVMG2Handle>::value, "QVM Pointers must be trivially destructible (as they are owned by the module)");
+
+// The server looks at a sharedEntity, which is the start of the game's gentity_t structure.
+// As such, this is part of the module API/ABI and must not be changed.
+// There are however subtle differences between native and QVM modules, as their pointer size may differ.
+template<ModuleContext Ctx>
+struct sharedEntityMapper_t {
+	// use either native or wrapped pointers based on the type of module
+	template<typename T>
+	using modulePointer_t = typename std::conditional<Ctx == ModuleContext::Native, T*, QVMPointer<T>>::type;
+	using moduleG2Pointer_t = typename std::conditional<Ctx == ModuleContext::Native, CGhoul2Info_v*, QVMG2Handle>::type;
+
 	entityState_t	s;				// communicated by server to clients
-	playerState_t* playerState;	//needs to be in the gentity for bg entity access
-	//if you want to actually see the contents I guess
-	//you will have to be sure to VMA it first.
+	modulePointer_t<playerState_t> playerState;	//needs to be in the gentity for bg entity access
+	// If you want to actually see the contents, you'll need a vehicleMapper_t
+	// because the type has different layouts in native and QVM.
+	// But for now, we just need to check this for nullness.
 #if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	Vehicle_t* m_pVehicle; //vehicle data
+	modulePointer_t<Vehicle_t> m_pVehicle; //vehicle data
 #else
-	struct Vehicle_s* m_pVehicle; //vehicle data
+	modulePointer_t<struct Vehicle_s> m_pVehicle; //vehicle data
 #endif
-	void* ghoul2; //g2 instance
+	moduleG2Pointer_t		ghoul2; //g2 instance
 	int32_t			localAnimIndex; //index locally (game/cgame) to anim data for this skel
 	vec3_t			modelScale; //needed for g2 collision
 
@@ -76,15 +121,15 @@ typedef struct sharedEntity_s {
 
 	//Script/ICARUS-related fields
 	int32_t			taskID[NUM_TIDS];
-	parms_t* parms;
-	char* behaviorSet[NUM_BSETS];
-	char* script_targetname;
+	modulePointer_t<parms_t> parms;
+	modulePointer_t<char> behaviorSet[NUM_BSETS];
+	modulePointer_t<char> script_targetname;
 	int32_t			delayScriptTime;
-	char* fullName;
+	modulePointer_t<char> fullName;
 
 	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
-	char* targetname;
-	char* classname;			// set in QuakeEd
+	modulePointer_t<char> targetname;
+	modulePointer_t<char> classname;			// set in QuakeEd
 
 	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
 	int32_t			waypoint;			//Set once per frame, if you've moved, and if someone asks
@@ -96,88 +141,39 @@ typedef struct sharedEntity_s {
 	int32_t			failedWaypointCheckTime;
 
 	int32_t			next_roff_time; //rww - npc's need to know when they're getting roff'd
-} sharedEntity_t;
+};
 
-typedef struct sharedEntity_qvm_s {
-	entityState_t	s;				// communicated by server to clients
-	uint32_t		playerState;	//needs to be in the gentity for bg entity access
-	//if you want to actually see the contents I guess
-	//you will have to be sure to VMA it first.
-	uint32_t		m_pVehicle; //vehicle data
-	uint32_t		ghoul2; //g2 instance
-	int				localAnimIndex; //index locally (game/cgame) to anim data for this skel
-	vec3_t			modelScale; //needed for g2 collision
+// Provides access to elements of an array with a known base, but dynamic length (stride).
+// This is used to access the game entities array.
+// The size of gentity_t is chosen by the module, but it always starts with a sharedEntity_*_t header.
+template<typename T>
+class ArrayBaseView {
+public:
+	// usually you'd use a constructor to initialize objects,
+	// but inside of server_t this will be reset with memset 0,
+	// so it needs to be trivially constructible.
+	void reinit(void* data, ptrdiff_t stride, size_t size) {
+		assert(m_stride >= sizeof(T));
+		m_data = data;
+		m_stride = stride;
+		m_size = size;
+	}
+	T* operator[](size_t index) const {
+		assert(index < m_size);
+		return reinterpret_cast<T*>(m_data + index * m_stride);
+	}
+	size_t indexOf(const T* ptr) const {
+		assert(ptr >= this[0]);
+		assert(ptr <= this[m_size-1]);
+		return (reinterpret_cast<byte*>(ptr) - reinterpret_cast<byte*>(m_data)) / m_stride;
+	}
+private:
+	void* m_data;
+	ptrdiff_t m_stride;
+	size_t m_size; // for server_t.gentities, this should be <= MAX_GENTITIES
+};
 
-	//from here up must also be unified with bgEntity/centity
-
-	entityShared_t	r;				// shared by both the server system and game
-
-	//Script/ICARUS-related fields
-	int				taskID[NUM_TIDS];
-	uint32_t		parms;
-	uint32_t		behaviorSet[NUM_BSETS];
-	uint32_t		script_targetname;
-	int				delayScriptTime;
-	uint32_t		fullName;
-
-	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
-	uint32_t		targetname;
-	uint32_t		classname;			// set in QuakeEd
-
-	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
-	int				waypoint;			//Set once per frame, if you've moved, and if someone asks
-	int				lastWaypoint;		//To make sure you don't double-back
-	int				lastValidWaypoint;	//ALWAYS valid -used for tracking someone you lost
-	int				noWaypointTime;		//Debouncer - so don't keep checking every waypoint in existance every frame that you can't find one
-	int				combatPoint;
-	int				failedWaypoints[MAX_FAILED_NODES];
-	int				failedWaypointCheckTime;
-
-	int				next_roff_time; //rww - npc's need to know when they're getting roff'd
-} sharedEntity_qvm_t;
-
-typedef struct sharedEntityMapper_s {
-	entityState_t* s;				// communicated by server to clients
-	playerState_t** playerState;	//needs to be in the gentity for bg entity access
-	//if you want to actually see the contents I guess
-	//you will have to be sure to VMA it first.
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	Vehicle_t** m_pVehicle; //vehicle data
-#else
-	struct Vehicle_s** m_pVehicle; //vehicle data
-#endif
-	void** ghoul2; //g2 instance
-	int* localAnimIndex; //index locally (game/cgame) to anim data for this skel
-	vec3_t* modelScale; //needed for g2 collision
-
-	//from here up must also be unified with bgEntity/centity
-
-	entityShared_t* r;				// shared by both the server system and game
-
-	//Script/ICARUS-related fields
-	int				(*taskID)[NUM_TIDS];
-	parms_t** parms;
-	char** behaviorSet[NUM_BSETS];
-	char** script_targetname;
-	int* delayScriptTime;
-	char** fullName;
-
-	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
-	char** targetname;
-	char** classname;			// set in QuakeEd
-
-	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
-	int* waypoint;			//Set once per frame, if you've moved, and if someone asks
-	int* lastWaypoint;		//To make sure you don't double-back
-	int* lastValidWaypoint;	//ALWAYS valid -used for tracking someone you lost
-	int* noWaypointTime;		//Debouncer - so don't keep checking every waypoint in existance every frame that you can't find one
-	int* combatPoint;
-	int				(*failedWaypoints)[MAX_FAILED_NODES];
-	int* failedWaypointCheckTime;
-
-	int* next_roff_time; //rww - npc's need to know when they're getting roff'd
-} sharedEntityMapper_t;
-
+static_assert(std::is_trivially_destructible<ArrayBaseView<sharedEntity_native_t>>::value, "ArrayBaseView must be trivially destructible so it can be part of server_t and reset with memset");
 
 typedef struct server_s {
 	serverState_t	state;
@@ -193,12 +189,12 @@ typedef struct server_s {
 
 	char			*entityParsePoint;	// used during game VM init
 
-	sharedEntityMapper_t gentitiesMapper[MAX_GENTITIES];
-
 	// the game virtual machine will update these on init and changes
-	sharedEntity_t	*gentities;
-	int				gentitySize;
-	int				num_entities;		// current number, <= MAX_GENTITIES
+	union {
+		// the module is native if and only if gvm->dllHandle != NULL
+		ArrayBaseView<sharedEntity_native_t> native;
+		ArrayBaseView<sharedEntity_qvm_t> qvm;
+	} gentities;
 
 	playerState_t	*gameClients;
 	int				gameClientSize;		// will be > sizeof(playerState_t) due to game private data
@@ -282,8 +278,10 @@ typedef struct client_s {
 	int				lastMessageNum;		// for delta compression
 	int				lastClientCommand;	// reliable client message sequence
 	char			lastClientCommandString[MAX_STRING_CHARS];
-	sharedEntity_t	*gentity;			// SV_GentityNum(clientnum)
-	sharedEntityMapper_t *gentityMapper;
+	union {
+		sharedEntity_native_t* native;
+		sharedEntity_qvm_t* qvm;
+	} gentity; // SV_GentityNum(clientnum)
 	char			name[MAX_NAME_LENGTH];			// extracted from userinfo, high bits masked
 
 	// downloading
@@ -508,36 +506,34 @@ void SV_SendClientSnapshot( client_t *client );
 //
 // sv_game.c
 //
-int	SV_NumForGentity( const sharedEntity_t *ent );
-int	SV_NumForGentityMapper( const sharedEntityMapper_t *ent );
-sharedEntity_t *SV_GentityNum( int num );
-sharedEntityMapper_t *SV_GentityMapperNum( int num );
+template<ModuleContext Ctx>
+int	SV_NumForGentity( const sharedEntityMapper_t<Ctx> *ent );
+// Without C++17's `if constexpr` we need to specialize the template per ModuleContext,
+// which sadly includes explicitly defining all specializations here:
+template<> int	SV_NumForGentity<ModuleContext::Native>(const sharedEntityMapper_t<ModuleContext::Native>* ent);
+template<> int	SV_NumForGentity<ModuleContext::QVM>(const sharedEntityMapper_t<ModuleContext::QVM>* ent);
+
+template<ModuleContext Ctx>
+sharedEntityMapper_t<Ctx> *SV_GentityNum( int num );
+template<> sharedEntityMapper_t<ModuleContext::Native>* SV_GentityNum<ModuleContext::Native>(int num);
+template<> sharedEntityMapper_t<ModuleContext::QVM>* SV_GentityNum<ModuleContext::QVM>(int num);
+
 playerState_t *SV_GameClientNum( int num );
-svEntity_t	*SV_SvEntityForGentity( sharedEntity_t *gEnt );
-svEntity_t	*SV_SvEntityForGentityMapper( sharedEntityMapper_t *gEnt );
-sharedEntity_t *SV_GEntityForSvEntity( svEntity_t *svEnt );
-sharedEntityMapper_t *SV_GEntityMapperForSvEntity( svEntity_t *svEnt );
-sharedEntityMapper_t *SV_GEntityMapperForGentity( const sharedEntity_t *gEnt );
+
+template<ModuleContext Ctx>
+svEntity_t	*SV_SvEntityForGentity(sharedEntityMapper_t<Ctx> *gEnt );
+
+template<ModuleContext Ctx>
+sharedEntityMapper_t<Ctx>*SV_GEntityForSvEntity( svEntity_t *svEnt );
+
 void		SV_InitGameProgs ( void );
 void		SV_ShutdownGameProgs ( void );
 qboolean	SV_inPVS (const vec3_t p1, const vec3_t p2);
 
+qboolean SV_UsesQVM();
 CGhoul2Info_v *SV_G2Map_GetG2FromHandle( g2handleptr_t g2h );
 void SV_G2Map_Update( g2handleptr_t *g2h, CGhoul2Info_v *g2Ptr );
 
-#define ENTITYMAP_READER_PROTO( type, funcName ) type funcName( type *inPtr );
-
-ENTITYMAP_READER_PROTO( char*, SV_EntityMapperReadString );
-ENTITYMAP_READER_PROTO( void*, SV_EntityMapperReadData );
-ENTITYMAP_READER_PROTO( playerState_t*, SV_EntityMapperReadPlayerState );
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	ENTITYMAP_READER_PROTO( Vehicle_t*, SV_EntityMapperReadVehicle );
-#else
-	ENTITYMAP_READER_PROTO( struct Vehicle_s*, SV_EntityMapperReadVehicle );
-#endif
-ENTITYMAP_READER_PROTO( parms_t*, SV_EntityMapperReadParms );
-
-void *SV_EntityMapperReadGhoul2( void **inPtr );
 
 //
 // sv_bot.c
@@ -564,11 +560,13 @@ void BotImport_DebugPolygonDelete(int id);
 void SV_ClearWorld (void);
 // called after the world model has been loaded, before linking any entities
 
-void SV_UnlinkEntity( sharedEntityMapper_t *ent );
+template<ModuleContext Ctx>
+void SV_UnlinkEntity( sharedEntityMapper_t<Ctx> *ent );
 // call before removing an entity, and before trying to move one,
 // so it doesn't clip against itself
 
-void SV_LinkEntity( sharedEntityMapper_t *ent );
+template<ModuleContext Ctx>
+void SV_LinkEntity( sharedEntityMapper_t<Ctx> *ent );
 // Needs to be called any time an entity changes origin, mins, maxs,
 // or solid.  Automatically unlinks if needed.
 // sets ent->v.absmin and ent->v.absmax
@@ -576,7 +574,8 @@ void SV_LinkEntity( sharedEntityMapper_t *ent );
 // is not solid
 
 
-clipHandle_t SV_ClipHandleForEntity( const sharedEntityMapper_t *ent );
+template<ModuleContext Ctx>
+clipHandle_t SV_ClipHandleForEntity( const sharedEntityMapper_t<Ctx> *ent );
 
 
 void SV_SectorList_f( void );
