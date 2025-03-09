@@ -210,37 +210,78 @@ typedef struct parms_s {
 typedef struct Vehicle_s Vehicle_t;
 #endif
 
+// sharedEntity_t differs in layout between QVM and 64 bit native modules because it contains pointers.
+// Modules need not care about this difference, as it happens implicitly.
+// But the engine needs two different definitions for QVM and native, which it models using C++ templates.
+// Modules don't use C++, so we use macros to still be able to share this code between modules and engine.
+#if defined(_GAME) || defined(_CGAME) || defined(_UI_BUILD)
+#define SHARED_STRUCT_START(name) typedef struct name##_s {
+#define SHARED_STRUCT_POINTER(type) type*
+#define SHARED_STRUCT_END(name) } name##_t;
+#else
+#include <type_traits>
+
+enum class ModuleContext {
+	QVM,
+	Native,
+};
+void* VM_ArgPtr(intptr_t intValue);
+template<typename T>
+class QVMPointer {
+public:
+	// implicit conversions to T* handle VM pointer resolution vai VM_ArgPtr
+	operator T* () const {
+		return reinterpret_cast<T*>(VM_ArgPtr(static_cast<intptr_t>(vmPtr)));
+	}
+private:
+	int32_t vmPtr;
+};
+static_assert(std::is_standard_layout<QVMPointer<void>>::value, "QVMPointer needs to work like a 32 bit void*");
+static_assert(std::is_trivially_constructible<QVMPointer<void>>::value, "QVMPointer needs to work like a 32 bit void*");
+static_assert(std::is_trivially_copyable<QVMPointer<void>>::value, "QVMPointer needs to work like a 32 bit void*");
+static_assert(std::is_trivially_destructible<QVMPointer<void>>::value, "QVMPointer needs to work like a 32 bit void*");
+static_assert(sizeof(QVMPointer<void>) == 4, "QVMPointer needs to work like a 32 bit void*");
+
+#define SHARED_STRUCT_START(name) template<ModuleContext Ctx>\
+struct name##_t {\
+	template<typename T>\
+	using ModulePointer = std::conditional_t<Ctx == ModuleContext::QVM, QVMPointer<T>, T*>;
+#define SHARED_STRUCT_POINTER(type) ModulePointer<type>
+#define SHARED_STRUCT_END(name) };
+#endif
+
 // the server looks at a sharedEntity, which is the start of the game's gentity_t structure
-//mod authors should not touch this struct
-typedef struct sharedEntity_s {
-	entityState_t	s;				// communicated by server to clients
-	playerState_t	*playerState;	//needs to be in the gentity for bg entity access
+// mod authors should not touch this struct
+SHARED_STRUCT_START(sharedEntity)
+	entityState_t							s;				// communicated by server to clients
+	SHARED_STRUCT_POINTER(playerState_t)	playerState;	//needs to be in the gentity for bg entity access
 									//if you want to actually see the contents I guess
 									//you will have to be sure to VMA it first.
 #if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	Vehicle_t		*m_pVehicle; //vehicle data
+	SHARED_STRUCT_POINTER(Vehicle_t)		m_pVehicle; //vehicle data
 #else
-	struct Vehicle_s		*m_pVehicle; //vehicle data
+	SHARED_STRUCT_POINTER(struct Vehicle_s)	m_pVehicle; //vehicle data
 #endif
-	void			*ghoul2; //g2 instance
-	int32_t			localAnimIndex; //index locally (game/cgame) to anim data for this skel
-	vec3_t			modelScale; //needed for g2 collision
+	// TODO add a special magic g2handle_t/CGhoul2Info_v* pointer that uses SV_G2Map_GetG2FromHandle
+	SHARED_STRUCT_POINTER(void)	ghoul2; //g2 instance
+	int32_t						localAnimIndex; //index locally (game/cgame) to anim data for this skel
+	vec3_t						modelScale; //needed for g2 collision
 
 	//from here up must also be unified with bgEntity/centity
 
 	entityShared_t	r;				// shared by both the server system and game
 
 	//Script/ICARUS-related fields
-	int32_t			taskID[NUM_TIDS];
-	parms_t			*parms;
-	char			*behaviorSet[NUM_BSETS];
-	char			*script_targetname;
-	int32_t			delayScriptTime;
-	char			*fullName;
+	int32_t							taskID[NUM_TIDS];
+	SHARED_STRUCT_POINTER(parms_t)	parms;
+	SHARED_STRUCT_POINTER(char)		behaviorSet[NUM_BSETS];
+	SHARED_STRUCT_POINTER(char)		script_targetname;
+	int32_t							delayScriptTime;
+	SHARED_STRUCT_POINTER(char)		fullName;
 
 	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
-	char			*targetname;
-	char			*classname;			// set in QuakeEd
+	SHARED_STRUCT_POINTER(char)		targetname;
+	SHARED_STRUCT_POINTER(char)		classname;			// set in QuakeEd
 
 	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
 	int32_t			waypoint;			//Set once per frame, if you've moved, and if someone asks
@@ -252,7 +293,7 @@ typedef struct sharedEntity_s {
 	int32_t			failedWaypointCheckTime;
 
 	int32_t			next_roff_time; //rww - npc's need to know when they're getting roff'd
-} sharedEntity_t;
+SHARED_STRUCT_END(sharedEntity)
 
 typedef struct sharedEntity_qvm_s {
 	entityState_t	s;				// communicated by server to clients
