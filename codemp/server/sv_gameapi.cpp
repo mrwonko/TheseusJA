@@ -34,6 +34,22 @@ along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 #include <unordered_map>
 
+// these types are passed back and forth between engine and modules, so they need a stable size & layout:
+static_assert(sizeof(qboolean) == 4, "qboolean is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(vec_t) == 4, "vec_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(ivec2_t) == 8, "ivec2_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(trType_t) == 4, "trType_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(trajectory_t) == 36, "trajectory_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(playerState_t) == 1552, "playerState_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(entityState_t) == 532, "entityState_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(entityShared_t) == 112, "entityShared_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(parms_t) == 1024, "parms_t is part of the module ABI and must not change in size or layout");
+static_assert(sizeof(sharedEntity_qvm_t) == 864, "sharedEntity_qvm_t is part of the module ABI and must not change in size or layout");
+// sharedEntity_t contains pointers, so its layout differs between 32 and 64 bit
+static_assert(sizeof(void*) == 4 ? sizeof(sharedEntity_t) == 864 : true, "sharedEntity_t is part of the module ABI and must not change in size or layout in 32 bit");
+static_assert(sizeof(void*) == 8 ? sizeof(sharedEntity_t) == 976 : true, "sharedEntity_t is part of the module ABI and must not change in size or layout in 64 bit");
+static_assert(sizeof(siegePers_t) == 12, "siegePers_t is part of the module ABI and must not change in size or layout");
+
 botlib_export_t	*botlib_export;
 
 // game interface
