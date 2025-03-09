@@ -81,15 +81,15 @@ typedef struct failedEdge_e
 
 typedef struct entityShared_s {
 	qboolean	linked;				// qfalse if not in any good cluster
-	int			linkcount;
+	int32_t		linkcount;
 
-	int			svFlags;			// SVF_NOCLIENT, SVF_BROADCAST, etc
-	int			singleClient;		// only send to this client when SVF_SINGLECLIENT is set
+	int32_t		svFlags;			// SVF_NOCLIENT, SVF_BROADCAST, etc
+	int32_t		singleClient;		// only send to this client when SVF_SINGLECLIENT is set
 
 	qboolean	bmodel;				// if false, assume an explicit mins / maxs bounding box
 									// only set by trap_SetBrushModel
 	vec3_t		mins, maxs;
-	int			contents;			// CONTENTS_TRIGGER, CONTENTS_SOLID, CONTENTS_BODY, etc
+	int32_t		contents;			// CONTENTS_TRIGGER, CONTENTS_SOLID, CONTENTS_BODY, etc
 									// a non-solid entity should set to 0
 
 	vec3_t		absmin, absmax;		// derived from mins/maxs and origin + rotation
@@ -107,7 +107,7 @@ typedef struct entityShared_s {
 	// ent->s.number == passEntityNum	(don't interact with self)
 	// ent->s.ownerNum = passEntityNum	(don't interact with your own missiles)
 	// entity[ent->s.ownerNum].ownerNum = passEntityNum	(don't interact with other missiles from owner)
-	int			ownerNum;
+	int32_t		ownerNum;
 
 	// mask of clients that this entity should be broadcast to
 	// the first 32 clients are represented by the first array index and the latter 32 clients are represented by the
@@ -223,7 +223,7 @@ typedef struct sharedEntity_s {
 	struct Vehicle_s		*m_pVehicle; //vehicle data
 #endif
 	void			*ghoul2; //g2 instance
-	int				localAnimIndex; //index locally (game/cgame) to anim data for this skel
+	int32_t			localAnimIndex; //index locally (game/cgame) to anim data for this skel
 	vec3_t			modelScale; //needed for g2 collision
 
 	//from here up must also be unified with bgEntity/centity
@@ -231,11 +231,11 @@ typedef struct sharedEntity_s {
 	entityShared_t	r;				// shared by both the server system and game
 
 	//Script/ICARUS-related fields
-	int				taskID[NUM_TIDS];
+	int32_t			taskID[NUM_TIDS];
 	parms_t			*parms;
 	char			*behaviorSet[NUM_BSETS];
 	char			*script_targetname;
-	int				delayScriptTime;
+	int32_t			delayScriptTime;
 	char			*fullName;
 
 	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
@@ -243,15 +243,15 @@ typedef struct sharedEntity_s {
 	char			*classname;			// set in QuakeEd
 
 	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
-	int				waypoint;			//Set once per frame, if you've moved, and if someone asks
-	int				lastWaypoint;		//To make sure you don't double-back
-	int				lastValidWaypoint;	//ALWAYS valid -used for tracking someone you lost
-	int				noWaypointTime;		//Debouncer - so don't keep checking every waypoint in existance every frame that you can't find one
-	int				combatPoint;
-	int				failedWaypoints[MAX_FAILED_NODES];
-	int				failedWaypointCheckTime;
+	int32_t			waypoint;			//Set once per frame, if you've moved, and if someone asks
+	int32_t			lastWaypoint;		//To make sure you don't double-back
+	int32_t			lastValidWaypoint;	//ALWAYS valid -used for tracking someone you lost
+	int32_t			noWaypointTime;		//Debouncer - so don't keep checking every waypoint in existance every frame that you can't find one
+	int32_t			combatPoint;
+	int32_t			failedWaypoints[MAX_FAILED_NODES];
+	int32_t			failedWaypointCheckTime;
 
-	int				next_roff_time; //rww - npc's need to know when they're getting roff'd
+	int32_t			next_roff_time; //rww - npc's need to know when they're getting roff'd
 } sharedEntity_t;
 
 typedef struct sharedEntity_qvm_s {
