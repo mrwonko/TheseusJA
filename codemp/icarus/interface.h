@@ -29,6 +29,8 @@ typedef	float vec3_t[3];
 class CSequencer;
 class CTaskManager;
 
+typedef struct sharedEntityMapper_s sharedEntityMapper_t;
+
 typedef struct interface_export_s
 {
 	//General
