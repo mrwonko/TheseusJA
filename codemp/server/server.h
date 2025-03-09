@@ -92,6 +92,10 @@ typedef struct server_s {
 	qboolean		demosPruned; // whether or not existing demos were cleaned up already
 } server_t;
 
+static_assert(std::is_trivially_constructible< server_t >::value, "server must be resettable using memset 0");
+static_assert(std::is_trivially_destructible< server_t >::value, "server must be resettable using memset 0");
+static_assert(std::is_standard_layout< server_t >::value, "server must be resettable using memset 0");
+
 typedef struct clientSnapshot_s {
 	int				areabytes;
 	byte			areabits[MAX_MAP_AREA_BYTES];		// portalarea visibility bits
