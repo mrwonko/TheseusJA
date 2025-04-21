@@ -393,18 +393,7 @@ void		SV_InitGameProgs ( void );
 void		SV_ShutdownGameProgs ( void );
 qboolean	SV_inPVS (const vec3_t p1, const vec3_t p2);
 
-#define ENTITYMAP_READER_PROTO( type, funcName ) type funcName( type *inPtr );
-
-ENTITYMAP_READER_PROTO( char*, SV_EntityMapperReadString );
-ENTITYMAP_READER_PROTO( void*, SV_EntityMapperReadData );
-ENTITYMAP_READER_PROTO( playerState_t*, SV_EntityMapperReadPlayerState );
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	ENTITYMAP_READER_PROTO( Vehicle_t*, SV_EntityMapperReadVehicle );
-#else
-	ENTITYMAP_READER_PROTO( struct Vehicle_s*, SV_EntityMapperReadVehicle );
-#endif
-ENTITYMAP_READER_PROTO( parms_t*, SV_EntityMapperReadParms );
-
+void* SV_EntityMapperReadPointer(pointerMapper_t ptr);
 g2handleptr_t SV_EntityMapperReadGhoul2( sharedEntityMapper_t *svEnt );
 
 //

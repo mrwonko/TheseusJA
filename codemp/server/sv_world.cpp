@@ -755,7 +755,7 @@ Ghoul2 Insert Start
 				com_optvehtrace->integer &&
 				touch->s->eType == ET_NPC &&
 				touch->s->NPC_class == CLASS_VEHICLE &&
-				SV_EntityMapperReadVehicle(touch->m_pVehicle))
+				SV_EntityMapperReadPointer(touch->m_pVehicle))
 			{ //for vehicles cache the transform data.
 				re->G2API_CollisionDetectCache(G2Trace, *sv_g2Mapping.Lookup(SV_EntityMapperReadGhoul2(touch)), angles, touch->r->currentOrigin, sv.time, touch->s->number, clip->start, clip->end, *touch->modelScale, G2VertSpaceServer, 0, clip->useLod, fRadius);
 			}

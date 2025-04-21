@@ -210,6 +210,11 @@ typedef struct parms_s {
 typedef struct Vehicle_s Vehicle_t;
 #endif
 
+// In the QVM, the Vehicle_s memory layout differs, because it contains pointers.
+// We don't currently actually access any of its fields, so the type is a stub for now,
+// to be properly defined if and when somebody needs it.
+typedef struct Vehicle_qvm_s Vehicle_qvm_t;
+
 // the server looks at a sharedEntity, which is the start of the game's gentity_t structure
 //mod authors should not touch this struct
 typedef struct sharedEntity_s {
@@ -256,10 +261,10 @@ typedef struct sharedEntity_s {
 
 typedef struct sharedEntity_qvm_s {
 	entityState_t	s;				// communicated by server to clients
-	uint32_t		playerState;	//needs to be in the gentity for bg entity access
-									//if you want to actually see the contents I guess
-									//you will have to be sure to VMA it first.
-	uint32_t		m_pVehicle; //vehicle data
+	qvmPointerTo(playerState_t)	playerState;	//needs to be in the gentity for bg entity access
+												//if you want to actually see the contents I guess
+												//you will have to be sure to VMA it first.
+	qvmPointerTo(Vehicle_qvm_t)	m_pVehicle; //vehicle data (careful: QVM memory layout differs from native Vehicle_t!)
 	g2handle_t		ghoul2; //g2 instance
 	int				localAnimIndex; //index locally (game/cgame) to anim data for this skel
 	vec3_t			modelScale; //needed for g2 collision
@@ -270,15 +275,15 @@ typedef struct sharedEntity_qvm_s {
 
 	//Script/ICARUS-related fields
 	int				taskID[NUM_TIDS];
-	uint32_t		parms;
-	uint32_t		behaviorSet[NUM_BSETS];
-	uint32_t		script_targetname;
+	qvmPointerTo(parms_t)	parms;
+	qvmPointerTo(char)	behaviorSet[NUM_BSETS];
+	qvmPointerTo(char)		script_targetname;
 	int				delayScriptTime;
-	uint32_t		fullName;
+	qvmPointerTo(char)		fullName;
 
 	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
-	uint32_t		targetname;
-	uint32_t		classname;			// set in QuakeEd
+	qvmPointerTo(char)	targetname;
+	qvmPointerTo(char)	classname;			// set in QuakeEd
 
 	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
 	int				waypoint;			//Set once per frame, if you've moved, and if someone asks
@@ -292,17 +297,26 @@ typedef struct sharedEntity_qvm_s {
 	int				next_roff_time; //rww - npc's need to know when they're getting roff'd
 } sharedEntity_qvm_t;
 
+// A pointer to a pointer in module memory.
+// Dereference and translate using SV_EntityMapperReadPointer.
+typedef union pointerMapper_u {
+	void** native; // pointer to a real pointer, which can be typecast and used directly
+	qvmPointer_t* qvm; // pointer to a 32-bit-qvm address, which must be resolved using VM_ArgPtr(*qvm)
+} pointerMapper_t;
+// Documentation helper to annotate the underlying type.
+// Doesn't actually store anything.
+#define pointerMapperFor(T) pointerMapper_t
+
 typedef struct sharedEntityMapper_s {
 	entityState_t	*s;				// communicated by server to clients
-	playerState_t	**playerState;	//needs to be in the gentity for bg entity access
+	pointerMapperFor(playerState_t) playerState;	//needs to be in the gentity for bg entity access
 									//if you want to actually see the contents I guess
 									//you will have to be sure to VMA it first.
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	Vehicle_t		**m_pVehicle; //vehicle data
-#else
-	struct Vehicle_s		**m_pVehicle; //vehicle data
-#endif
-	union { // use SV_EntityMapperReadGhoul2 to correctly dereference this
+	pointerMapperFor(Vehicle_t | Vehicle_qvm_t)	m_pVehicle; // vehicle data (careful: QVM memory layout differs from native Vehicle_t!)
+	// ghoul2 is a bit of a special case because it doesn't point to QVM memory;
+	// use SV_EntityMapperReadGhoul2 to correctly dereference this,
+	// then use the sv_g2Mapping to resolve the resulting handle.
+	union {
 		g2handleptr_t	*ghoul2Native; // in native code, it's a pointer to a pointer
 		g2handle_t		*ghoul2QVM; // but in QVM, it's a pointer to a 32 bit handle - hence the union
 	};
@@ -315,15 +329,15 @@ typedef struct sharedEntityMapper_s {
 
 	//Script/ICARUS-related fields
 	int				(*taskID)[NUM_TIDS];
-	parms_t			**parms;
-	char			**behaviorSet[NUM_BSETS];
-	char			**script_targetname;
+	pointerMapperFor(parms_t)	parms;
+	pointerMapperFor(char)	behaviorSet[NUM_BSETS];
+	pointerMapperFor(char)	script_targetname;
 	int				*delayScriptTime;
-	char			**fullName;
+	pointerMapperFor(char)	fullName;
 
 	//rww - targetname and classname are now shared as well. ICARUS needs access to them.
-	char			**targetname;
-	char			**classname;			// set in QuakeEd
+	pointerMapperFor(char)	targetname;
+	pointerMapperFor(char)	classname;			// set in QuakeEd
 
 	//rww - and yet more things to share. This is because the nav code is in the exe because it's all C++.
 	int				*waypoint;			//Set once per frame, if you've moved, and if someone asks

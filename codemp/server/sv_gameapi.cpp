@@ -538,31 +538,31 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 			entM = &sv.gentitiesMapper[i];
 
 			// Assign all values
-			entM->s                       = &ent->s;
-			entM->playerState             = &ent->playerState;
-			entM->m_pVehicle              = &ent->m_pVehicle;
-			entM->ghoul2Native            = reinterpret_cast<g2handleptr_t*>(&ent->ghoul2);
-			entM->localAnimIndex          = &ent->localAnimIndex;
-			entM->modelScale              = &ent->modelScale;
-			entM->r                       = &ent->r;
-			entM->taskID                  = &ent->taskID;
-			entM->parms                   = &ent->parms;
+			entM->s                         = &ent->s;
+			entM->playerState.native        = reinterpret_cast<void**>(&ent->playerState);
+			entM->m_pVehicle.native         = reinterpret_cast<void**>(&ent->m_pVehicle);
+			entM->ghoul2Native              = reinterpret_cast<g2handleptr_t*>(&ent->ghoul2);
+			entM->localAnimIndex            = &ent->localAnimIndex;
+			entM->modelScale                = &ent->modelScale;
+			entM->r                         = &ent->r;
+			entM->taskID                    = &ent->taskID;
+			entM->parms.native              = reinterpret_cast<void**>(&ent->parms);
 			for ( j = 0; j < NUM_BSETS; j++ ) {
-				entM->behaviorSet[j]      = &(ent->behaviorSet[j]);
+				entM->behaviorSet[j].native = reinterpret_cast<void**>((&(ent->behaviorSet[j])));
 			}
-			entM->script_targetname       = &ent->script_targetname;
-			entM->delayScriptTime         = &ent->delayScriptTime;
-			entM->fullName                = &ent->fullName;
-			entM->targetname              = &ent->targetname;
-			entM->classname               = &ent->classname;
-			entM->waypoint                = &ent->waypoint;
-			entM->lastWaypoint            = &ent->lastWaypoint;
-			entM->lastValidWaypoint       = &ent->lastValidWaypoint;
-			entM->noWaypointTime          = &ent->noWaypointTime;
-			entM->combatPoint             = &ent->combatPoint;
-			entM->failedWaypoints         = &ent->failedWaypoints;
-			entM->failedWaypointCheckTime = &ent->failedWaypointCheckTime;
-			entM->next_roff_time          = &ent->next_roff_time;
+			entM->script_targetname.native  = reinterpret_cast<void**>(&ent->script_targetname);
+			entM->delayScriptTime           = &ent->delayScriptTime;
+			entM->fullName.native           = reinterpret_cast<void**>(&ent->fullName);
+			entM->targetname.native         = reinterpret_cast<void**>(&ent->targetname);
+			entM->classname.native          = reinterpret_cast<void**>(&ent->classname);
+			entM->waypoint                  = &ent->waypoint;
+			entM->lastWaypoint              = &ent->lastWaypoint;
+			entM->lastValidWaypoint         = &ent->lastValidWaypoint;
+			entM->noWaypointTime            = &ent->noWaypointTime;
+			entM->combatPoint               = &ent->combatPoint;
+			entM->failedWaypoints           = &ent->failedWaypoints;
+			entM->failedWaypointCheckTime   = &ent->failedWaypointCheckTime;
+			entM->next_roff_time            = &ent->next_roff_time;
 		}
 	} else {
 		sharedEntity_qvm_t *ent;
@@ -573,26 +573,22 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 
 			// Assign all values
 			entM->s                       = &ent->s;
-			entM->playerState             = (playerState_t**)&ent->playerState;
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-			entM->m_pVehicle              = (Vehicle_t**)&ent->m_pVehicle;
-#else
-			entM->m_pVehicle              = (struct Vehicle_s**)&ent->m_pVehicle;
-#endif
+			entM->playerState.qvm         = &ent->playerState;
+			entM->m_pVehicle.qvm          = &ent->m_pVehicle;
 			entM->ghoul2QVM               = &ent->ghoul2;
 			entM->localAnimIndex          = &ent->localAnimIndex;
 			entM->modelScale              = &ent->modelScale;
 			entM->r                       = &ent->r;
 			entM->taskID                  = &ent->taskID;
-			entM->parms                   = (parms_t**)&ent->parms;
+			entM->parms.qvm               = &ent->parms;
 			for ( j = 0; j < NUM_BSETS; j++ ) {
-				entM->behaviorSet[j]      = (char**)&(ent->behaviorSet[j]);
+				entM->behaviorSet[j].qvm  = &(ent->behaviorSet[j]);
 			}
-			entM->script_targetname       = (char**)&ent->script_targetname;
+			entM->script_targetname.qvm   = &ent->script_targetname;
 			entM->delayScriptTime         = &ent->delayScriptTime;
-			entM->fullName                = (char**)&ent->fullName;
-			entM->targetname              = (char**)&ent->targetname;
-			entM->classname               = (char**)&ent->classname;
+			entM->fullName.qvm            = &ent->fullName;
+			entM->targetname.qvm          = &ent->targetname;
+			entM->classname.qvm           = &ent->classname;
 			entM->waypoint                = &ent->waypoint;
 			entM->lastWaypoint            = &ent->lastWaypoint;
 			entM->lastValidWaypoint       = &ent->lastValidWaypoint;
@@ -605,24 +601,14 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 	}
 }
 
-#define ENTITYMAP_READER( type, funcName ) \
-	type funcName( type *inPtr ) { \
-		if ( gvm->dllHandle ) { \
-			return *inPtr; \
-		} else { \
-			return (type)VM_ArgPtr((intptr_t)(*(uint32_t*)inPtr)); \
-		} \
+void* SV_EntityMapperReadPointer(pointerMapper_t ptr) {
+	if (gvm->dllHandle) {
+		return *ptr.native;
 	}
-
-ENTITYMAP_READER( char*, SV_EntityMapperReadString );
-ENTITYMAP_READER( void*, SV_EntityMapperReadData );
-ENTITYMAP_READER( playerState_t*, SV_EntityMapperReadPlayerState );
-#if (!defined(MACOS_X) && !defined(__GCC__) && !defined(__GNUC__))
-	ENTITYMAP_READER( Vehicle_t*, SV_EntityMapperReadVehicle );
-#else
-	ENTITYMAP_READER( struct Vehicle_s*, SV_EntityMapperReadVehicle );
-#endif
-ENTITYMAP_READER( parms_t*, SV_EntityMapperReadParms );
+	else {
+		return VM_ArgPtr(*ptr.qvm);
+	}
+}
 
 g2handleptr_t SV_EntityMapperReadGhoul2(sharedEntityMapper_t* svEnt) {
 	if (gvm->dllHandle) {

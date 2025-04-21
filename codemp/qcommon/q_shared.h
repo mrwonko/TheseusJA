@@ -155,6 +155,11 @@ typedef int32_t qhandle_t, thandle_t, fxHandle_t, sfxHandle_t, fileHandle_t, cli
 // In QVMs, this is an opaque numeric g2handle_t, while in native modules, it's a CGhoul2Info_v*
 // (which modules are not _supposed_ to inspect, but conceivably might...)
 typedef intptr_t g2handleptr_t;
+// A pointer into QVM memory. Needs to be translated using VM_ArgPtr to resolve it.
+typedef uint32_t qvmPointer_t;
+// A helper to annotate qvmPointer_t with the pointer type.
+// This is purely for documentation, the type information isn't actually stored anywhere.
+#define qvmPointerTo(T) qvmPointer_t
 
 #define NULL_HANDLE ((qhandle_t)0)
 #define NULL_SOUND ((sfxHandle_t)0)
