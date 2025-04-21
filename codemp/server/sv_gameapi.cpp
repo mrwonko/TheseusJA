@@ -541,7 +541,7 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 			entM->s                       = &ent->s;
 			entM->playerState             = &ent->playerState;
 			entM->m_pVehicle              = &ent->m_pVehicle;
-			entM->ghoul2                  = &ent->ghoul2;
+			entM->ghoul2Native            = reinterpret_cast<g2handleptr_t*>(&ent->ghoul2);
 			entM->localAnimIndex          = &ent->localAnimIndex;
 			entM->modelScale              = &ent->modelScale;
 			entM->r                       = &ent->r;
@@ -579,7 +579,7 @@ static void SV_UpdateSharedEntitiesMapping( void ) {
 #else
 			entM->m_pVehicle              = (struct Vehicle_s**)&ent->m_pVehicle;
 #endif
-			entM->ghoul2                  = (void**)&ent->ghoul2;
+			entM->ghoul2QVM               = &ent->ghoul2;
 			entM->localAnimIndex          = &ent->localAnimIndex;
 			entM->modelScale              = &ent->modelScale;
 			entM->r                       = &ent->r;
@@ -624,12 +624,12 @@ ENTITYMAP_READER( playerState_t*, SV_EntityMapperReadPlayerState );
 #endif
 ENTITYMAP_READER( parms_t*, SV_EntityMapperReadParms );
 
-g2handleptr_t SV_EntityMapperReadGhoul2( void **inPtr ) {
-	if ( gvm->dllHandle ) {
-		return reinterpret_cast<g2handleptr_t>(*inPtr);
-	} else {
-		// For QVMs the address is actually a handle we have to interpret as int32_t/g2handle_t
-		return static_cast<g2handleptr_t>(*reinterpret_cast<g2handle_t*>(inPtr));
+g2handleptr_t SV_EntityMapperReadGhoul2(sharedEntityMapper_t* svEnt) {
+	if (gvm->dllHandle) {
+		return *svEnt->ghoul2Native;
+	}
+	else {
+		return static_cast<g2handleptr_t>(*svEnt->ghoul2QVM);
 	}
 }
 
