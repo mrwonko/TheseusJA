@@ -47,14 +47,6 @@ int	SV_NumForGentityMapper( const sharedEntityMapper_t *ent ) {
 	return ent - sv.gentitiesMapper;
 }
 
-sharedEntity_t *SV_GentityNum( int num ) {
-	sharedEntity_t *ent;
-
-	ent = (sharedEntity_t *)((byte *)sv.gentities + sv.gentitySize*(num));
-
-	return ent;
-}
-
 sharedEntityMapper_t *SV_GentityMapperNum( int num ) {
 	if ( num < 0 || num >= (int)ARRAY_LEN(sv.gentitiesMapper) ) return NULL;
 	return &sv.gentitiesMapper[num];
@@ -80,13 +72,6 @@ svEntity_t	*SV_SvEntityForGentityMapper( sharedEntityMapper_t *gEnt ) {
 		Com_Error( ERR_DROP, "SV_SvEntityForGentity: bad gEnt" );
 	}
 	return &sv.svEntities[ gEnt->s->number ];
-}
-
-sharedEntity_t *SV_GEntityForSvEntity( svEntity_t *svEnt ) {
-	int		num;
-
-	num = svEnt - sv.svEntities;
-	return SV_GentityNum( num );
 }
 
 sharedEntityMapper_t *SV_GEntityMapperForSvEntity( svEntity_t *svEnt ) {

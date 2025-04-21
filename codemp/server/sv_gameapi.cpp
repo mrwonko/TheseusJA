@@ -3017,7 +3017,6 @@ void SV_InitGame( qboolean restart ) {
 	// clear level pointers
 	sv.entityParsePoint = CM_EntityString();
 	for ( i=0, cl=svs.clients; i<sv_maxclients->integer; i++, cl++ ) {
-		cl->gentity = NULL;
 		cl->gentityMapper = NULL;
 	}
 

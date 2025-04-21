@@ -307,16 +307,17 @@ bool ICARUS_ValidEnt( sharedEntityMapper_t *ent )
 			//and while this allows us to read it on our "fake" entity here, we can't modify pointers like this. We can however do
 			//something completely hackish such as the following.
 			assert(ent->s->number >= 0 && ent->s->number < MAX_GENTITIES);
-			sharedEntity_t *trueEntity = SV_GentityNum(ent->s->number);
 
 			//This works because we're modifying the actual shared game vm data and turning one pointer into another.
 			//While these pointers both look like garbage to us in here, they are not.
 			if ( VM_IsCurrentQVM() )
 			{
-				sharedEntity_qvm_t *trueEntityQVM = (sharedEntity_qvm_t*)trueEntity;
-				trueEntityQVM->script_targetname = trueEntityQVM->targetname;
+				*ent->script_targetname.qvm = *ent->targetname.qvm;
 			}
-			else trueEntity->script_targetname = trueEntity->targetname;
+			else
+			{
+				*ent->script_targetname.native = *ent->targetname.native;
+			}
 			return true;
 		}
 	}

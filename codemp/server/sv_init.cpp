@@ -673,7 +673,6 @@ Ghoul2 Insert End
 					client->state = CS_ACTIVE;
 					client->gentityMapper = SV_GentityMapperNum( i );
 					client->gentityMapper->s->number = i;
-					client->gentity = SV_GentityNum( i );
 
 					client->deltaMessage = -1;
 					client->nextSnapshotTime = svs.time;	// generate a snapshot immediately

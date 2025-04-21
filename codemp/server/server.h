@@ -153,8 +153,7 @@ typedef struct client_s {
 	int				lastMessageNum;		// for delta compression
 	int				lastClientCommand;	// reliable client message sequence
 	char			lastClientCommandString[MAX_STRING_CHARS];
-	sharedEntity_t	*gentity;			// SV_GentityNum(clientnum)
-	sharedEntityMapper_t *gentityMapper;
+	sharedEntityMapper_t *gentityMapper;	// SV_GentityMapperNum(clientnum)
 	char			name[MAX_NAME_LENGTH];			// extracted from userinfo, high bits masked
 
 	// downloading
@@ -381,12 +380,10 @@ void SV_SendClientSnapshot( client_t *client );
 //
 int	SV_NumForGentity( const sharedEntity_t *ent );
 int	SV_NumForGentityMapper( const sharedEntityMapper_t *ent );
-sharedEntity_t *SV_GentityNum( int num );
 sharedEntityMapper_t *SV_GentityMapperNum( int num );
 playerState_t *SV_GameClientNum( int num );
 svEntity_t	*SV_SvEntityForGentity( sharedEntity_t *gEnt );
 svEntity_t	*SV_SvEntityForGentityMapper( sharedEntityMapper_t *gEnt );
-sharedEntity_t *SV_GEntityForSvEntity( svEntity_t *svEnt );
 sharedEntityMapper_t *SV_GEntityMapperForSvEntity( svEntity_t *svEnt );
 sharedEntityMapper_t *SV_GEntityMapperForGentity( const sharedEntity_t *gEnt );
 void		SV_InitGameProgs ( void );
